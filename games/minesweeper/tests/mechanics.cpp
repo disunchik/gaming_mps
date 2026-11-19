@@ -19,10 +19,12 @@
 
 /** @brief Ожидаемая геометрия на экране 72×30. */
 struct Tile {
-    int width;
-    int height;
+    int width; ///< Ширина клетки в символах.
+    int height; ///< Высота клетки в строках.
 };
+/** @brief Допустимые размеры отображаемой клетки. */
 static constexpr Tile tiles[] = {{7, 3}, {6, 2}, {5, 2}, {4, 2}, {4, 1}};
+/** @brief Символ закрытой клетки. */
 static constexpr std::string_view closed = "▪";
 
 /** @brief Возвращает событие мыши в заданной точке клетки. */
@@ -82,7 +84,7 @@ static void auditField(Settings settings, int expectedMines) {
     CHECK(!mine[settings.firstY * size + settings.firstX]);
 
     game.start(settings);
-    CHECK(frame(game).find("Мин: " + std::to_string(expectedMines)) != std::string::npos);
+    CHECK(frame(game).find("Динамиты: " + std::to_string(expectedMines)) != std::string::npos);
     game.update(1250);
     CHECK(game.result().timeMs == 1250);
     for (int y = 0; y < size; ++y) {
@@ -143,7 +145,7 @@ static void auditInput() {
     game.update(3200);
     CHECK(game.result().timeMs == 0 && game.result().firstX == -1);
     CHECK(frame(game).find("Флагов: 256") != std::string::npos);
-    CHECK(frame(game).find("Осталось мин: -218") != std::string::npos);
+    CHECK(frame(game).find("Осталось: -218") != std::string::npos);
     for (int i = 0; i < size * size; ++i) {
         game.handle(mouse(InputType::PointerRight, size, i % size, i / size));
     }

@@ -4,7 +4,7 @@ import base64
 import sys
 import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'tools'))
-from clipboard import ClipboardBridge
+from clipboard import ClipboardBridge, paste_bytes
 
 
 class BridgeTests(unittest.TestCase):
@@ -29,6 +29,27 @@ class BridgeTests(unittest.TestCase):
         self.assertLessEqual(len(bridge.pending), 128)
         self.assertEqual(bridge.feed(b'tail\x07OK'), (b'OK', b''))
 
+
+    def test_paste_query_fragmentation(self):
+        code = 'P2-4SW5-CD0J-0228E'
+        reads = []
+        bridge = ClipboardBridge(reader=lambda: reads.append(True) or code.lower())
+        output, reply = b'', b''
+        for byte in b'hello\x1b]52;c;?\x07world':
+            normal, response = bridge.feed(bytes([byte]))
+            output += normal; reply += response
+        self.assertEqual(output, b'helloworld')
+        self.assertEqual(reads, [True])
+        self.assertEqual(reply, b'\x1b[200~' + code.encode() + b'\x1b[201~')
+
+    def test_paste_rejects_other_clipboard_content(self):
+        for text in (None, '', 'qprc', 'P2-4SW5-CD0J-0228E\nq',
+                     'P2-4SW5-CD0J-0228E\x1b[A', 'A' * 10000):
+            self.assertEqual(paste_bytes(text), b'\x1b[903~')
+        def unavailable():
+            raise OSError('clipboard busy')
+        self.assertEqual(ClipboardBridge(reader=unavailable).feed(b'\x1b]52;c;?\x07'),
+                         (b'', b'\x1b[903~'))
 
 if __name__ == '__main__':
     unittest.main()

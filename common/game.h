@@ -5,7 +5,7 @@
 struct Input;
 class Screen;
 
-/** @brief Идентификаторы игр в коде испытания версии 1. */
+/** @brief Идентификаторы игр в коде испытания P2. */
 enum class GameId : std::uint8_t { Tetris = 0, Minesweeper = 1, Pong = 2 };
 /** @brief Три доступные сложности. */
 enum class Difficulty : std::uint8_t { Easy = 0, Normal = 1, Hard = 2 };

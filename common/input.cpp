@@ -26,6 +26,10 @@ bool InputReader::finish(Input& event) {
     if (std::strcmp(sequence_, "\x1b[910~") == 0) { event.type = InputType::HeldLeft; return true; }
     if (std::strcmp(sequence_, "\x1b[911~") == 0) { event.type = InputType::HeldRight; return true; }
     if (std::strcmp(sequence_, "\x1b[912~") == 0) { event.type = InputType::HorizontalReleased; return true; }
+    if (std::strcmp(sequence_, "\x1b[200~") == 0) { paste_ = true; event.type = InputType::PasteBegin; return true; }
+    if (std::strcmp(sequence_, "\x1b[201~") == 0) { paste_ = false; event.type = InputType::PasteEnd; return true; }
+    if (std::strcmp(sequence_, "\x1b[903~") == 0) { event.type = InputType::PasteFailed; return true; }
+    if (std::strcmp(sequence_, "\x1b[930~") == 0) { event.type = InputType::Redraw; return true; }
     switch (final) {
         case 'A': event.type = InputType::Up; break;
         case 'B': event.type = InputType::Down; break;
@@ -61,9 +65,14 @@ bool InputReader::feed(std::uint8_t byte, std::uint32_t now, bool textMode, Inpu
         escapeTime_ = now;
         return false;
     }
+    if (paste_) {
+        if (byte >= 32 && byte <= 126) { event.type = InputType::PasteText; event.character = byte; }
+        return event.type != InputType::None;
+    }
     if (byte == '\n' && carriageReturn_) { carriageReturn_ = false; return false; }
     carriageReturn_ = byte == '\r';
-    if (byte == '\r' || byte == '\n') event.type = InputType::Confirm;
+    if (byte == 22) event.type = InputType::Paste;
+    else if (byte == '\r' || byte == '\n') event.type = InputType::Confirm;
     else if (byte == 8 || byte == 127) event.type = InputType::Erase;
     else if (textMode && byte >= 32 && byte <= 126) {
         event.type = InputType::Text;

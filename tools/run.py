@@ -93,19 +93,64 @@ class Qemu:
             self.log.close()
 
 
+class UartStream:
+    """Adapt pyserial to the same recv/sendall interface as the QEMU UART socket."""
+    def __init__(self, port):
+        self.port = port
+
+    def recv(self, count):
+        data = self.port.read(min(count, max(1, self.port.in_waiting)))
+        if not data: raise socket.timeout()
+        return data
+
+    def sendall(self, data):
+        pending = memoryview(data)
+        while pending:
+            written = self.port.write(pending)
+            if not written: raise OSError('UART не принимает данные')
+            pending = pending[written:]
+
+
+class SerialPort:
+    """Open an ESP32 USB-UART without flashing or toggling boot/reset lines."""
+    def __init__(self, port, baud=115200):
+        self.name, self.baud = port, baud
+        self.port = None
+
+    def __enter__(self):
+        import serial
+        self.port = serial.serial_for_url(self.name, baudrate=self.baud,
+            timeout=0.2, write_timeout=2, do_not_open=True)
+        self.port.dtr = self.port.rts = False
+        try:
+            self.port.open()
+            self.serial = UartStream(self.port)
+            return self
+        except BaseException:
+            self.port.close()
+            raise
+
+    def __exit__(self, *_):
+        if self.port: self.port.close()
+
+
 def main():
     """Run the native input/output bridge; F10 or Ctrl+] exits."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--no-build', action='store_true')
     parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--port', help='COM-порт настоящего ESP32, например COM5')
+    parser.add_argument('--baud', type=int, default=115200)
     args = parser.parse_args()
-    if not args.no_build:
+    if args.port and args.debug: parser.error('--debug доступен для QEMU')
+    if not args.no_build and not args.port:
         subprocess.run([sys.executable, str(Path(os.environ['IDF_PATH']) / 'tools/idf.py'),
                         '-DIDF_TARGET=esp32', 'build'], cwd=ROOT, check=True)
-    print('QEMU: F10 или Ctrl+] — выйти. Все игровые вычисления выполняет ESP32.')
+    print(f'{args.port or "QEMU"}: F10 или Ctrl+] — выйти.')
     if args.debug: print('Ожидание GDB: во втором терминале idf.py gdb')
     try:
-        with Terminal() as terminal, Qemu(args.debug) as qemu:
+        with Terminal() as terminal, (SerialPort(args.port, args.baud) if args.port else Qemu(args.debug)) as qemu:
+            qemu.serial.sendall(b'\x1b[930~')
             bridge = ClipboardBridge()
             send_lock = threading.Lock()
             alive = threading.Event()

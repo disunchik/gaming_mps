@@ -43,12 +43,16 @@ def main():
         assert all(cell[0] == ' ' and cell[2] == 234 for y, row in enumerate(wide.cells)
                    for x, cell in enumerate(row) if x >= 100 or y >= 40)
         wide.snapshot(artifacts / 'screens', 'viewport-wide')
+        click(30, 23, 'КРАТКАЯ СВОДКА САЛУНА')
+        assert s.model.text().count('__|__') == 2
+        s.snapshot('help-opening')
+        s.send(b'\r', 'Выбери игру')
         click(30, 15, 'Меняет начальный темп'); click(30, 23, 'КАССА САЛУНА')
         s.wait('Убери 1 ряд'); s.snapshot('tetris')
         tetris_code = code()
         s.send(b'c', 'Скопировано'); assert code() == tetris_code
         s.send(b'q', 'Выбери игру')
-        click(30, 17, 'Меняет долю мин')
+        click(30, 17, 'Меняет долю динамита')
         for _ in range(4): click(64, 19, 'Размер:')
         s.wait('16x16')
         click(42, 19, '14x14'); click(64, 19, '16x16')
@@ -85,16 +89,16 @@ def main():
         s.send(b'\r', 'Матч до 5 очков'); assert code() == 'P2-4SW5-CD0J-0228E'
         s.snapshot('pong-code')
         s.send(mouse_bytes(35, 3, 20))
-        s.wait('', 40, condition=lambda m: 'Партия окончена' in m.text() or 'Уровень пройден' in m.text())
+        s.wait('', 40, condition=lambda m: 'Проиграл дуэль' in m.text() or 'Соперник переигран' in m.text())
         s.snapshot('pong-result')
         s.send(b'q', 'Выбери игру'); click(30, 21, 'Введи код друга')
         # Independently generated P2 packet for level 4, normal, seed 0x12345678.
-        s.send(EXTREME + b'\r', 'Начальный уровень: 4'); s.send(b'\r', 'БОТЫ')
+        s.send(EXTREME + b'\r', 'Начальный уровень: 4'); s.send(b'\r', 'КОВБОИ')
         s.snapshot('pong-extreme')
         top = s.model.text().splitlines()[6]
         assert top.count('==========') == 2, top
-        s.send(b'q', 'Выбери игру'); click(30, 23, 'ПРАВИЛА САЛУНА')
-        s.wait('ПКМ / F — флаг'); s.snapshot('help')
+        s.send(b'q', 'Выбери игру'); click(30, 23, 'КРАТКАЯ СВОДКА САЛУНА')
+        s.wait('ПКМ / F — бандана'); s.snapshot('help')
         s.send(b'\x1b', 'Выбери игру')
         print('PASS: 100x40, real Tetris and Pong, Minesweeper stub, Pong keyboard/mouse, level selection, replay/fresh seed, P2/CRC and P1 rejected, copy/footer/pause, extreme two bots, clean panels, full viewport background')
     with Qemu(debug=True, port=5556):

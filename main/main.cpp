@@ -36,10 +36,13 @@ extern "C" void app_main() {
         std::uint8_t byte;
         Input event;
         for (int count = 0; count < 512 && uart_read_bytes(UART_NUM_0, &byte, 1, 0) == 1; ++count) {
-            if (reader.feed(byte, static_cast<std::uint32_t>(now), menu.textMode(), event))
-                menu.handle(event);
+            if (reader.feed(byte, static_cast<std::uint32_t>(now), menu.textMode(), event)) {
+                if (event.type == InputType::Redraw) screen.invalidate();
+                else menu.handle(event);
+            }
         }
         if (reader.poll(static_cast<std::uint32_t>(now), event)) menu.handle(event);
+        if (menu.takePasteRequest()) screen.requestPaste();
         const auto copy = menu.takeCopyRequest();
         if (!copy.empty()) screen.copyText(copy);
         if (now - rendered >= 50) {

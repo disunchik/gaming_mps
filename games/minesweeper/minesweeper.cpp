@@ -289,9 +289,9 @@ void Minesweeper::draw(Screen& screen) const {
     screen.panelText(1, "─────────────────────", Theme::border);
     screen.panelText(3, "Поле: " + side + "x" + side);
     screen.panelText(4, difficultyName(difficulty_), Theme::muted);
-    screen.panelNumber(6, "Мин:", mines_);
+    screen.panelNumber(6, "Динамиты:", mines_);
     screen.panelNumber(8, "Флагов:", flags_);
-    screen.panelNumber(9, "Осталось мин:", mines_ - flags_, Theme::muted);
+    screen.panelNumber(9, "Осталось:", mines_ - flags_, Theme::muted);
     screen.panelNumber(11, "Время, с:", static_cast<std::int64_t>(result_.timeMs / 1000));
     screen.panelText(13, "─────────────────────", Theme::border);
     screen.panelText(15, "Enter/ЛКМ: открыть");

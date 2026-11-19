@@ -55,13 +55,51 @@ def copy_text(text):
         user.DestroyWindow(window)
 
 
+def read_text():
+    """Read bounded Unicode clipboard text only after an explicit paste request."""
+    if os.name != 'nt': return None
+    from ctypes import wintypes as W
+    user = C.WinDLL('user32', use_last_error=True)
+    kernel = C.WinDLL('kernel32', use_last_error=True)
+    user.OpenClipboard.argtypes = [W.HWND]
+    user.GetClipboardData.argtypes = [W.UINT]; user.GetClipboardData.restype = W.HANDLE
+    kernel.GlobalSize.argtypes = [W.HANDLE]; kernel.GlobalSize.restype = C.c_size_t
+    kernel.GlobalLock.argtypes = [W.HANDLE]; kernel.GlobalLock.restype = C.c_void_p
+    kernel.GlobalUnlock.argtypes = [W.HANDLE]
+    deadline = time.monotonic() + 0.25
+    while not user.OpenClipboard(None):
+        if time.monotonic() >= deadline: return None
+        time.sleep(0.01)
+    try:
+        handle = user.GetClipboardData(13)
+        if not handle: return None
+        size = kernel.GlobalSize(handle)
+        if size < 2 or size > 8192: return None
+        pointer = kernel.GlobalLock(handle)
+        if not pointer: return None
+        try: return C.wstring_at(pointer, size // 2).split('\0', 1)[0]
+        finally: kernel.GlobalUnlock(handle)
+    finally:
+        user.CloseClipboard()
+
+
+def paste_bytes(text):
+    """Allow only one P2 code; never send clipboard commands or newlines to UART."""
+    if not isinstance(text, str): return b'\x1b[903~'
+    code = text.strip().upper()
+    if not re.fullmatch(r'P2-[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{5}', code):
+        return b'\x1b[903~'
+    return b'\x1b[200~' + code.encode('ascii') + b'\x1b[201~'
+
+
 class ClipboardBridge:
     """Strip OSC52 from arbitrary UART chunks and return a success/failure response."""
     prefix = b'\x1b]52;c;'
 
-    def __init__(self, copier=copy_text):
+    def __init__(self, copier=copy_text, reader=read_text):
         self.pending = bytearray()
         self.copier = copier
+        self.reader = reader
         self.discarding = False
 
     def feed(self, data):
@@ -94,6 +132,10 @@ class ClipboardBridge:
                 del self.pending[:end + 1]; replies.extend(b'\x1b[902~'); continue
             encoded = bytes(self.pending[len(self.prefix):end])
             del self.pending[:end + 1]
+            if encoded == b'?':
+                try: replies.extend(paste_bytes(self.reader()))
+                except (OSError, ValueError): replies.extend(b'\x1b[903~')
+                continue
             success = False
             try:
                 text = base64.b64decode(encoded, validate=True).decode('ascii')

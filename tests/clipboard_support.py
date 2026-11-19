@@ -5,7 +5,7 @@ from ctypes import wintypes as W
 from clipboard import copy_text
 
 
-def verified_copy(text):
+def verified_copy(text, inspect=None):
     """Duplicate all formats before testing, then restore the user's clipboard."""
     user = C.WinDLL('user32', use_last_error=True)
     kernel = C.WinDLL('kernel32', use_last_error=True)
@@ -53,6 +53,7 @@ def verified_copy(text):
             finally: kernel.GlobalUnlock(handle)
         finally:
             user.CloseClipboard()
+        if inspect: inspect()
         return True
     finally:
         open_clipboard()

@@ -67,6 +67,13 @@ static void inputTests() {
     CHECK(feed("\x1b[910~")); CHECK(event.type == InputType::HeldLeft);
     CHECK(feed("\x1b[911~")); CHECK(event.type == InputType::HeldRight);
     CHECK(feed("\x1b[912~", true)); CHECK(event.type == InputType::HorizontalReleased);
+    CHECK(feed("\x16", true)); CHECK(event.type == InputType::Paste);
+    CHECK(feed("\x1b[200~")); CHECK(event.type == InputType::PasteBegin);
+    CHECK(feed("qprc")); CHECK(event.type == InputType::PasteText);
+    CHECK(!feed("\r"));
+    CHECK(feed("\x1b[201~")); CHECK(event.type == InputType::PasteEnd);
+    CHECK(feed("\x1b[903~")); CHECK(event.type == InputType::PasteFailed);
+    CHECK(feed("\x1b[930~")); CHECK(event.type == InputType::Redraw);
     CHECK(feed("r")); CHECK(event.type == InputType::Restart);
     CHECK(feed("q", true)); CHECK(event.type == InputType::Text && event.character == U'q');
     CHECK(feed("\r")); CHECK(!feed("\n"));
@@ -182,6 +189,7 @@ static void menuTests() {
     press(menu, InputType::Confirm);
     CHECK(pong.settings.level == 3 && pong.settings.seed == 0x12345678);
     menu.update(0); pong.current.state = State::Won; menu.update(1);
+    CHECK(view(menu).find("Соперник переигран") != std::string::npos);
     CHECK(view(menu).find("Экстремальный уровень") != std::string::npos);
     press(menu, InputType::Confirm); CHECK(pong.settings.level == 4);
     menu.update(0); pong.current.state = State::Won; menu.update(1);
@@ -235,6 +243,8 @@ static void screenTests() {
     CHECK(screen.plain().find("VISIBLE") != std::string::npos);
     CHECK(screen.plain().find("OUTSIDE") == std::string::npos);
     screen.flush(); CHECK(!bytes.empty()); bytes.clear(); screen.flush(); CHECK(bytes.empty());
+    screen.invalidate(); screen.flush(); CHECK(!bytes.empty()); bytes.clear();
+    screen.requestPaste(); CHECK(bytes == "\x1b]52;c;?\a"); bytes.clear();
     Tetris tetris; Minesweeper mines; Pong pong;
     Menu menu(tetris, mines, pong, seed);
     menu.draw(screen); const auto first = screen.plain(); screen.flush(); bytes.clear();
@@ -251,8 +261,44 @@ static void screenTests() {
     CHECK(Screen::boardX(16) == 20 && Screen::boardY(16) == 7);
 }
 
+
+/** @brief Проверяет запрос буфера, замену текста, отказ и границу бонусного уровня. */
+static void pasteAndBonusTests() {
+    Fake tetris, mines, pong;
+    Menu menu(tetris, mines, pong, seed);
+    press(menu, InputType::PointerLeft, 30, 21);
+    press(menu, InputType::Up); CHECK(menu.takePasteRequest()); CHECK(!menu.takePasteRequest());
+    press(menu, InputType::PasteBegin);
+    for (char c : std::string("P2-4SW5-CD0J-0228E")) {
+        Input input; input.type = InputType::PasteText; input.character = c; menu.handle(input);
+    }
+    press(menu, InputType::PasteEnd);
+    CHECK(view(menu).find("P2-4SW5-CD0J-0228E") != std::string::npos);
+    CHECK(pong.starts == 0);
+    press(menu, InputType::Paste); CHECK(menu.takePasteRequest());
+    press(menu, InputType::PasteFailed);
+    CHECK(view(menu).find("P2-4SW5-CD0J-0228E") != std::string::npos);
+    press(menu, InputType::Confirm); CHECK(view(menu).find("Код проверен") != std::string::npos);
+    for (unsigned difficulty = 0; difficulty < 3; ++difficulty) {
+        for (unsigned level = 1; level <= 3; ++level) {
+            Fake a, b, c;
+            Menu trial(a, b, c, seed);
+            press(trial, InputType::PointerLeft, 30, 21);
+            Settings settings; settings.level = level; settings.difficulty = static_cast<Difficulty>(difficulty);
+            for (char ch : encodeCode(GameId::Pong, settings)) {
+                Input input; input.type = InputType::Text; input.character = ch; trial.handle(input);
+            }
+            press(trial, InputType::Confirm); press(trial, InputType::Confirm);
+            trial.update(0); c.current.state = State::Won; trial.update(1);
+            CHECK((view(trial).find("Экстремальный уровень") != std::string::npos) == (level == 3));
+            press(trial, InputType::Restart); trial.update(0); c.current.state = State::Lost; trial.update(1);
+            CHECK(view(trial).find("Проиграл дуэль") != std::string::npos);
+        }
+    }
+}
+
 /** @brief Выполняет все проверки общей основы. */
 int main() {
-    inputTests(); codeTests(); menuTests(); mouseSettingsTests(); screenTests();
+    inputTests(); pasteAndBonusTests(); codeTests(); menuTests(); mouseSettingsTests(); screenTests();
     std::cout << "PASS: input, code vectors, pause/restart, pointer bounds, levels, renderer\n";
 }

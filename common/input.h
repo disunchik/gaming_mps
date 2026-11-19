@@ -9,7 +9,8 @@ enum class InputType : std::uint8_t {
     PointerMove, PointerLeft, PointerRight,
     Pause, Restart, Back, Text, Erase,
     Copy, CopySucceeded, CopyFailed,
-    HeldLeft, HeldRight, HorizontalReleased
+    HeldLeft, HeldRight, HorizontalReleased,
+    Paste, PasteBegin, PasteEnd, PasteFailed, PasteText, Redraw
 };
 
 /** @brief Одно событие; команды оболочки перехватываются до Game::handle. */
@@ -32,6 +33,7 @@ private:
     std::size_t used_ = 0; ///< Количество накопленных байтов.
     std::uint32_t escapeTime_ = 0; ///< Время последнего байта последовательности.
     bool carriageReturn_ = false; ///< Подавляет второй Enter от CRLF.
+    bool paste_ = false; ///< Изолирует текст вставки от горячих клавиш.
     bool discard_ = false; ///< Отбрасывает переполненную последовательность до конца.
     /** @brief Преобразует завершённую CSI/SS3-последовательность в событие. */
     bool finish(Input& event);

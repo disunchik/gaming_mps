@@ -169,3 +169,9 @@ void Screen::copyText(std::string_view text) {
     sequence += '\a';
     output_(sequence.data(), sequence.size(), context_);
 }
+
+void Screen::invalidate() { initialized_ = false; }
+void Screen::requestPaste() {
+    static constexpr char query[] = "\x1b]52;c;?\a";
+    output_(query, sizeof(query) - 1, context_);
+}

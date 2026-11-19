@@ -43,7 +43,7 @@ int PongModel::aimError() {
         const int amount = 3 * unit + random() % (2 * unit + 1);
         return random() & 1 ? amount : -amount;
     }
-    const int range = settings.difficulty == Difficulty::Easy ? 6 * unit
+    const int range = settings.difficulty == Difficulty::Easy ? 9 * unit / 2
                     : settings.difficulty == Difficulty::Normal ? 3 * unit : unit;
     return static_cast<int>(random() % (2 * range + 1)) - range;
 }

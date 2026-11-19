@@ -126,6 +126,14 @@ def worker(report):
         for symbol in 'P2-4SW5-CD0J-0228E':
             key(ord(symbol) if symbol != '-' else 189, russian.get(symbol, symbol).lower())
         wait('p2-4sw5-cd0j-0228e')  # C remains code text rather than Copy here.
+        def paste_up():
+            assert key(38) == b'\x1b[A'
+            wait('P2-4SW5-CD0J-0228E')
+        assert verified_copy('P2-4SW5-CD0J-0228E', paste_up)
+        def paste_ctrl_v():
+            assert key(86, '\x16', controls=8) == b'\x16'
+            wait('P2-4SW5-CD0J-0228E')
+        assert verified_copy('P2-4SW5-CD0J-0228E', paste_ctrl_v)
         key(13, '\r'); wait('Код проверен')
         key(13, '\r'); wait('Матч до 5 очков')
         assert 'P2-4SW5-CD0J-0228E' in model.text()

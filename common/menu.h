@@ -23,6 +23,8 @@ public:
     bool textMode() const;
     /** @brief Забирает одноразовый запрос копирования для UART, вне draw. */
     std::string takeCopyRequest();
+    /** @brief Забирает одноразовый запрос чтения буфера для страницы кода. */
+    bool takePasteRequest();
 private:
     /** @brief Экраны оболочки. */
     enum class Page { Main, Settings, Playing, Paused, Results, Code, CodeConfirm, Help };
@@ -37,6 +39,10 @@ private:
     std::array<Difficulty, 3> difficulties_{{Difficulty::Normal, Difficulty::Normal, Difficulty::Normal}}; ///< Запомненные сложности.
     std::uint32_t pongLevel_ = 1; ///< Выбранный обычный уровень Понга (1..3).
     std::uint32_t mineLevel_ = 1; ///< Выбранный стартовый размер сапёра.
+    bool pasteRequest_ = false; ///< Одноразовый запрос буфера ПК.
+    unsigned pasteWait_ = 0; ///< Ожидание ответа запускателя в мс.
+    bool pasting_ = false; ///< Принимается ограниченный пакет вставки.
+    std::string pasteText_; ///< Вставка до завершения пакета, отдельно от ручного ввода.
     std::string codeText_; ///< Вводимый код.
     std::string error_; ///< Ошибка ввода кода.
     std::string copyRequest_; ///< Ожидающий отправки код для буфера.

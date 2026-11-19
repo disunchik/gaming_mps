@@ -43,9 +43,9 @@ void Pong::draw(Screen& screen) const {
         screen.panelTextAt(20, row, "│", Theme::wood);
     }
     screen.panelText(12, "└───────────────────┘", Theme::wood);
-    screen.panelTextAt(5, 2, "СЧЁТ САЛУНА", Theme::white);
+    screen.panelTextAt(6, 2, "СЧЁТ ДУЭЛИ", Theme::white);
     screen.panelTextAt(3, 4, "ТЫ", Theme::white);
-    screen.panelTextAt(13, 4, model_.botCount() == 2 ? "БОТЫ" : "БОТ", Theme::white);
+    screen.panelTextAt(12, 4, model_.botCount() == 2 ? "КОВБОИ" : "КОВБОЙ", Theme::white);
     // Broad, monochrome chalk strokes; score is always 0..5.
     static constexpr const char* digits[6][5] = {
         {"███", "█ █", "█ █", "█ █", "███"}, {" █ ", "██ ", " █ ", " █ ", "███"},

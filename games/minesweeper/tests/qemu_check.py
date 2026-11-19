@@ -68,7 +68,7 @@ def main():
         session = Session(qemu)
         model = session.model
         session.wait("Выбери игру", 15)
-        session.send(click(30, 17), "Меняет долю мин")
+        session.send(click(30, 17), "Меняет долю динамита")
         session.send(b"ss\r", "Поле: 8x8")
         assert board(model) == CLOSED * 64
         assert "Код после первого открытия" in model.text()
@@ -123,7 +123,7 @@ def main():
                                for i in range(SIZE * SIZE) if i not in MINES)
         session.send(safe_clicks, "Уровень пройден")
         session.send(b"\r", "Поле: 10x10")
-        assert "Мин: 15" in model.text() and "Код после первого открытия" in model.text()
+        assert "Динамиты: 15" in model.text() and "Код после первого открытия" in model.text()
         session.send(b"q", "Выбери игру")
     print("PASS: ESP32/QEMU, large tiles, keyboard, mouse, flags, P2 replay, chord, win, loss and next board.")
 

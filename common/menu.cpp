@@ -23,7 +23,7 @@ Menu::Menu(Game& tetris, Game& minesweeper, Game& pong, Seed seed)
     : games_{{&tetris, &minesweeper, &pong}}, seed_(seed) {}
 Game& Menu::game() const { return *games_[static_cast<unsigned>(game_)]; }
 bool Menu::textMode() const { return page_ == Page::Code; }
-void Menu::home() { page_ = Page::Main; selected_ = mainSelected_; copyStatus_.clear(); copyWait_ = 0; copyRequest_.clear(); }
+void Menu::home() { pasteRequest_ = pasting_ = false; pasteWait_ = 0; pasteText_.clear(); page_ = Page::Main; selected_ = mainSelected_; copyStatus_.clear(); copyWait_ = 0; copyRequest_.clear(); }
 void Menu::start() {
     copyStatus_.clear(); copyWait_ = 0; copyRequest_.clear();
     game().start(settings_);
@@ -142,7 +142,17 @@ void Menu::handle(const Input& input) {
     }
 
     if (page_ == Page::Code) {
-        if (input.type == InputType::Back) home();
+        if (input.type == InputType::Up || input.type == InputType::Paste) {
+            if (!pasteWait_) { pasteRequest_ = true; pasteWait_ = 2000; error_ = "Читаю буфер…"; }
+        } else if (input.type == InputType::PasteBegin && pasteWait_) {
+            pasting_ = true; pasteText_.clear();
+        } else if (input.type == InputType::PasteText) {
+            if (pasting_ && pasteText_.size() < 64) pasteText_ += static_cast<char>(input.character);
+        } else if (input.type == InputType::PasteEnd && pasting_) {
+            codeText_ = pasteText_; pasteText_.clear(); pasting_ = false; pasteWait_ = 0; error_.clear();
+        } else if (input.type == InputType::PasteFailed && pasteWait_) {
+            pasting_ = false; pasteWait_ = 0; error_ = "В буфере нет кода P2";
+        } else if (input.type == InputType::Back) home();
         else if (input.type == InputType::Text) {
             if (codeText_.size() < 64 && input.character < 128) {
                 codeText_ += static_cast<char>(input.character); error_.clear();
@@ -219,6 +229,10 @@ void Menu::handle(const Input& input) {
     }
 }
 void Menu::update(std::uint32_t ms) {
+    if (pasteWait_) {
+        if (ms >= pasteWait_) { pasteWait_ = 0; pasting_ = false; error_ = "Буфер недоступен. Введи код вручную."; }
+        else pasteWait_ -= ms;
+    }
     if (page_ == Page::Main || page_ == Page::Settings || page_ == Page::Code ||
         page_ == Page::CodeConfirm || page_ == Page::Help)
         sceneryMs_ = (sceneryMs_ + ms % sceneryPeriodMs_) % sceneryPeriodMs_;
@@ -274,40 +288,55 @@ void Menu::draw(Screen& s) const {
             s.canvasFill(1, 4, 98, 32, Theme::background);
             s.canvasFill(18, 12, 64, 16, Theme::background);
             s.canvasFrame(18, 12, 64, 16, Theme::accent);
-            s.canvasText(23, 14, result_.state == State::Won ? "Уровень пройден" : "Партия окончена", Theme::accent);
+            s.canvasText(23, 14, result_.state == State::Won ? (game_ == GameId::Pong ? "Соперник переигран" : "Уровень пройден") : (game_ == GameId::Pong ? "Проиграл дуэль" : "Партия окончена"), Theme::accent);
             s.canvasText(23, 16, "Счёт: " + std::to_string(result_.score));
             s.canvasText(23, 17, "Игровое время: " + std::to_string(result_.timeMs / 1000) + " с");
             int row = 0;
-            if (hasNext()) { option(s, row, 16 + 2 * row, game_ == GameId::Pong && settings_.level == 3 ? "Экстремальный уровень (2 бота)" : "Следующий уровень"); ++row; }
+            if (hasNext()) { option(s, row, 16 + 2 * row, game_ == GameId::Pong && settings_.level == 3 ? "Экстремальный уровень (2 ковбоя)" : "Следующий уровень"); ++row; }
             option(s, row, 16 + 2 * row, "Повторить те же условия"); ++row;
             option(s, row, 16 + 2 * row, "В меню");
         }
         return;
     }
     scenery(s);
+    const char* mug[] = {"  .~~~~.   ", " |~~~~~~|_ ", " | | |  | )", " | | |  |/ ", " |______|  ", "  '----'   "};
+    for (int row = 0; row < 6; ++row)
+        s.canvasText(86, Screen::canvasHeight - 10 + row, mug[row], row == 0 ? Theme::white : Theme::accent);
+    const char* cactus[] = {"  |  ", "| |  ", "|_| |", "  |_|", "  |  ", "__|__"};
+    for (int i = 0; i < 6; ++i) {
+        s.canvasText(11, 23 + i, cactus[i], Theme::muted);
+        s.canvasText(84, 23 + i, cactus[i], Theme::muted);
+    }
     if (page_ == Page::Help) {
         s.canvasText(1, 2, "Три игры. Один салун.", Theme::muted);
-        s.canvasFill(12, 7, 76, 28, Theme::paper);
-        s.canvasFrame(12, 7, 76, 28, Theme::wood);
-        s.canvasFill(13, 8, 74, 3, Theme::wood);
-        s.canvasText(36, 9, "ПРАВИЛА САЛУНА «ТРИ СТВОЛА»", Theme::white, Theme::wood);
+        s.canvasFill(18, 5, 64, 30, Theme::paper);
+        s.canvasFrame(18, 5, 64, 30, Theme::wood);
+        s.canvasFill(19, 6, 62, 3, Theme::wood);
+        s.canvasText(38, 7, "КРАТКАЯ СВОДКА САЛУНА", Theme::white, Theme::wood);
         const auto ink = [&s](int x, int y, std::string_view value, Color color = Theme::ink) {
             s.canvasText(x, y, value, color, Theme::paper);
         };
-        ink(17, 12, "ТЕТРИС / ЗОЛОТАЯ ШАХТА", Theme::wood);
-        ink(19, 14, "A/D или ←/→ — сдвиг. W/↑ — поворот. S/↓ — быстрее.");
-        ink(19, 15, "Собирай ряды: каждые 10 линий открывают новый уровень.");
-        ink(17, 17, "САПЁР / МИННОЕ ПОЛЕ", Theme::wood);
-        ink(19, 19, "ЛКМ / Enter / пробел — открыть. ПКМ / F — флаг.");
-        ink(19, 20, "Стрелки/WASD — курсор. Береги сапоги: под ними мины.");
-        ink(17, 22, "ПИН-ПОНГ / РИКОШЕТ САЛУНА", Theme::wood);
-        ink(19, 24, "Держи A/D или ←/→. Мышью — веди ракетку за пробкой.");
-        ink(19, 25, "Первый до 5 очков забирает матч. После уровня 3 — бонус.");
-        s.canvasFill(16, 28, 68, 3, Theme::wood);
-        s.canvasText(19, 28, "P — пауза / перекур       R — повторить те же условия", Theme::white, Theme::wood);
-        s.canvasText(19, 30, "Q — вернуться в салун     C — скопировать код испытания", Theme::white, Theme::wood);
-        ink(19, 32, "Поделись кодом: друг начнёт с тех же стартовых условий.", Theme::paperMuted);
-        ink(19, 33, "Enter / Esc / ЛКМ — назад", Theme::paperMuted);
+        ink(21, 10, "ТЕТРИС / ЗАКАЗЫ ШАХТЫ", Theme::wood);
+        ink(23, 11, "A/D или ←/→ — сдвиг. W/↑ — поворот. S/↓ — быстрее.");
+        ink(23, 12, "Ряды дают заработок, заказы — дополнительные выплаты.");
+        ink(23, 13, "Жила, двойные очистки и серии — следи за афишей.");
+        ink(23, 14, "Каждые 10 линий — уровень. На сложной нет предпросмотра.");
+        ink(21, 16, "САПЁР / ДИНАМИТНАЯ ДОЛИНА", Theme::wood);
+        ink(23, 17, "ЛКМ / Enter — открыть. ПКМ / F — бандана.");
+        ink(23, 18, "Повторно нажми на открытую цифру: можно даблкликом.");
+        ink(23, 19, "Бандан вокруг столько же? Остальные соседи раскроются.");
+        ink(23, 20, "Ошибочная бандана может привести к взрыву.");
+        ink(23, 21, "Первый ход безопасен. Открой все клетки без динамита.");
+        ink(21, 23, "ПИН-ПОНГ / РИКОШЕТ САЛУНА", Theme::wood);
+        ink(23, 24, "A/D или ←/→, мышь — ракетка. Дуэль до 5 очков.");
+        ink(23, 25, "Уровень — скорость пробки, сложность — точность врага.");
+        ink(23, 26, "После 10 секунд без очка пробка начинает разгоняться.");
+        ink(23, 27, "Победи на уровне 3 — откроется дуэль с 2 ковбоями.");
+        s.canvasFill(20, 29, 60, 3, Theme::wood);
+        s.canvasText(23, 29, "P — пауза     R — повторить те же условия", Theme::white, Theme::wood);
+        s.canvasText(23, 31, "Q — в салун   C — скопировать код испытания", Theme::white, Theme::wood);
+        ink(23, 32, "↑ / Ctrl+V вставляет код на странице «Играть по коду».", Theme::paperMuted);
+        ink(23, 33, "Enter / Esc / ЛКМ — назад", Theme::paperMuted);
         return;
     }
     // A paper notice inside a wooden saloon sign; all controls keep their coordinates.
@@ -318,11 +347,6 @@ void Menu::draw(Screen& s) const {
     s.canvasText(1, 2, "Три игры. Один салун.", Theme::muted);
     if (page_ != Page::Code)
         s.canvasText(1, 37, "Стрелки/WASD: выбор   Enter/ЛКМ: подтвердить   Esc/Q: назад", Theme::muted);
-    const char* cactus[] = {"  |  ", "| |  ", "|_| |", "  |_|", "  |  ", "__|__"};
-    for (int i = 0; i < 6; ++i) {
-        s.canvasText(11, 23 + i, cactus[i], Theme::muted);
-        s.canvasText(84, 23 + i, cactus[i], Theme::muted);
-    }
     const auto text = [&s](int y, std::string_view label, Color color = Theme::ink) {
         s.canvasText(23, y + 5, label, color, Theme::paper);
     };
@@ -331,8 +355,8 @@ void Menu::draw(Screen& s) const {
     };
     if (page_ == Page::Main) {
         title("Выбери игру");
-        const char* items[] = {"Тетрис", "Сапёр", "Пин-понг", "Играть по коду", "Управление"};
-        const char* notes[] = {"01 / КОВБОЙ ПАША", "02 / КОВБОЙ ТЁМА", "03 / КОВБОЙ ДИМА", "КОД ИСПЫТАНИЯ", "ПРАВИЛА САЛУНА"};
+        const char* items[] = {"Тетрис", "Сапёр", "Пин-понг", "Играть по коду", "Краткая сводка"};
+        const char* notes[] = {"01 / КОВБОЙ ПАША", "02 / КОВБОЙ ТЁМА", "03 / КОВБОЙ ДИМА", "КОД ИСПЫТАНИЯ", "ПРАВИЛА И ФИШКИ"};
         for (int i = 0; i < 5; ++i) {
             const int y = 10 + 2 * i;
             option(s, i, y, items[i]);
@@ -343,7 +367,7 @@ void Menu::draw(Screen& s) const {
         title(gameName(game_));
         setting(s, 0, settingsDifficultyY_ - 5, "Сложность:", difficultyName(difficulties_[static_cast<unsigned>(game_)]));
         const char* hint = game_ == GameId::Tetris ? "Меняет начальный темп падения"
-            : game_ == GameId::Pong ? "Меняет только точность компьютера" : "Меняет долю мин: 10 / 15 / 20%";
+            : game_ == GameId::Pong ? "Меняет только точность врага" : "Меняет долю динамита: 10 / 15 / 20%";
         text(settingsDifficultyY_ - 4, hint, Theme::paperMuted);
         if (game_ == GameId::Minesweeper) {
             const std::string size = std::to_string(6 + 2 * mineLevel_);
@@ -352,7 +376,7 @@ void Menu::draw(Screen& s) const {
         }
         if (game_ == GameId::Pong) {
             setting(s, 1, settingsLevelY_ - 5, "Уровень:", std::to_string(pongLevel_));
-            text(settingsLevelY_ - 4, "1–3: начальная скорость мяча", Theme::paperMuted);
+            text(settingsLevelY_ - 4, "1–3: начальная скорость пробки", Theme::paperMuted);
         }
         option(s, rows() - 2, settingsStartY_ - 5, "Начать игру");
         option(s, rows() - 1, settingsBackY_ - 5, "Назад");
@@ -366,7 +390,7 @@ void Menu::draw(Screen& s) const {
         text(12, "> " + codeText_.substr(codeText_.size() > 54 ? codeText_.size() - 54 : 0));
         text(15, error_, Theme::paperError);
         text(19, "Формат: P2-XXXX-XXXX-XXXXX", Theme::paperMuted);
-        s.canvasText(1, 37, "Enter: проверить   Backspace: стереть   Esc: назад", Theme::muted);
+        s.canvasText(1, 37, "↑ / Ctrl+V: вставить код   Enter: проверить   Esc: назад", Theme::muted);
     } else if (page_ == Page::CodeConfirm) {
         title("Код проверен");
         text(10, std::string(gameName(game_)) + " / " + difficultyName(settings_.difficulty));
@@ -405,4 +429,10 @@ std::string Menu::takeCopyRequest() {
     std::string request;
     request.swap(copyRequest_);
     return request;
+}
+
+bool Menu::takePasteRequest() {
+    const bool pending = pasteRequest_;
+    pasteRequest_ = false;
+    return pending;
 }

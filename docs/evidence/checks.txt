@@ -1,16 +1,37 @@
+artifacts/host-submission.log
 PASS: acceleration thresholds/cap/reset, 12 configurations, two-bot bounds and difficulty accuracy
 PASS: Pong collisions, scoring, replay, input bounds, fixed-step determinism and pure draw
 PASS: input, code vectors, pause/restart, pointer bounds, levels, renderer
+
+artifacts/mines-host-submission.log
+PASS: 15 profiles, mine counts, numbers, wins and losses, input, flood fill, flags, score, timing, pause, board review, fresh seed, replay code, chord and return to menu.
+
+artifacts/test-submission.log
+....
+----------------------------------------------------------------------
+Ran 4 tests in 0.001s
+
+OK
+....
+----------------------------------------------------------------------
+Ran 4 tests in 0.001s
+
+OK
+..
+----------------------------------------------------------------------
+Ran 2 tests in 0.012s
+
+OK
 PASS: actual Windows console preserves fragmented UTF-8 and right edge
-PASS: 100x40, real Tetris and Pong, Minesweeper stub, Pong keyboard/mouse, level selection, replay/fresh seed, P2/CRC and P1 rejected, copy/footer/pause, extreme two bots, clean panels, full viewport background
-PASS: GDB app_main and two source steps: 0x400d4188 -> 0x400d418b -> 0x400d41ae
-PASS: native Windows console 100x40, mouse/keyboard -> Tetris and Pong, real clipboard read-back; RU/EN, held movement, release and focus loss
+PASS: 100x44, three playable games, Pong keyboard/mouse, level selection, replay/fresh seed, P2/CRC and P1 rejected, copy/footer/pause, extreme two cowboys, clean panels, full viewport background
+PASS: GDB app_main and two source steps: 0x400d4230 -> 0x400d4233 -> 0x400d4256
+PASS: native Windows console 100x44, mouse/keyboard -> Tetris and Pong, real clipboard read-back; RU/EN, held movement, release and focus loss
+PASS: measured automatic drop at 1497, 950, 500 ms; medium level 2 at 854 ms
 PASS: P2 challenge and deterministic replay
-PASS: ESP32 UART and menu, all difficulties, pause, replay, loss, bounty, gold and level 2
-Keyboard layout and held/release/focus tests: 4 passed; clipboard protocol tests: 2 passed.
-Mouse settings: both directions and bounds; drawing and click rows moved together to 16/19/23/25.
-Scenery: 3x2, 160 ms/column; C++ verifies movement, occlusion, right-side reappearance and full-cycle wrap; no game time in menus.
-QEMU UART verifies scenery movement without changing the notice content.
-Visual review: main, Pong, settings and help from UART. Native console 100x40 characters match firmware.
-Doxygen 1.18.0: no warnings; own firmware source files under 2000 lines.
-Full tools/test.ps1 completed with exit code 0.
+PASS: ESP32 UART, all difficulties, preview on easy/normal, pause, replay, loss, orders and level 2
+PASS: ESP32/QEMU, price of error, P2 replay, win and loss, full board review, fresh keys.
+
+Doxygen 1.18.0: successful generation with WARN_AS_ERROR=FAIL_ON_WARNINGS, no warnings.
+Own firmware source files: largest common/menu.cpp, 491 lines (limit 2000).
+Frames are reconstructed from actual firmware UART, not desktop screenshots.
+Physical ESP32/JTAG not tested.

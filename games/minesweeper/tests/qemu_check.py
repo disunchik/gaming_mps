@@ -80,6 +80,7 @@ def check_review(session, detonated=False):
     assert cells.count("X") == int(detonated)
     assert CLOSED not in cells
     assert any("Начать заново" in row[77:98] for row in model.text().splitlines())
+    session.snapshot("mines-review-lost" if detonated else "mines-review-won")
 
 
 def restart_fresh(session):
@@ -116,6 +117,7 @@ def main():
         assert "ДИНАМИТНАЯ ДОЛИНА" in model.text()
         assert model.text().splitlines()[5][77:98].startswith("Цена ошибки: 0")
         assert "Динамиты: 10" in model.text() and "Enter/ЛКМ" not in model.text()
+        session.snapshot("minesweeper")
 
         width, height = cell_size(7, 7)
         session.send(cell_click(7, 7, right=True, dx=width - 1, dy=height - 1), "Банданы: 1")
@@ -159,11 +161,13 @@ def main():
         assert board(model)[12] == CLOSED
         session.send(cell_click(3, 2))
         session.wait("Поле: 8x8", condition=lambda m: board(m)[12] != CLOSED)
+        session.snapshot("mines-chord")
 
         session.send(b"r", "Поле: 8x8")
         session.wait("Банданы: 0", condition=lambda m: board(m) == legacy_board)
         session.send(cell_click(4, 1, right=True), "Банданы: 1")
         session.send(cell_click(3, 2), "Не заметил растяжку")
+        session.snapshot("mines-result-lost")
         choose(session, "Посмотреть все поле", "К результату")
         check_review(session, detonated=True)
         mark_x, mark_y = cell_position(4, 1)
@@ -181,6 +185,7 @@ def main():
         session.send(safe_clicks, "Поле зачищено")
         assert "Цена ошибки: 54" in model.text()
         assert "Следующий уровень" in model.text()
+        session.snapshot("mines-result-won")
         session.send(b"ss\r", "К результату")
         check_review(session)
         mark_x, mark_y = cell_position(3, 1)

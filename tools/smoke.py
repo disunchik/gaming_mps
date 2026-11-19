@@ -1,4 +1,4 @@
-"""Exercise actual firmware menus, Pong and challenge codes in ESP32/QEMU."""
+"""Exercise actual firmware menus, Tetris, Pong and challenge codes in ESP32/QEMU."""
 import re
 import shutil
 import socket
@@ -30,7 +30,10 @@ def main():
             assert found, s.model.text()
             return found[0]
         s.wait('Выбери игру', 15); s.snapshot('main')
-        click(30, 15, 'Меняет начальный темп'); click(30, 21, 'Игра ещё не подключена')
+        click(30, 15, 'Меняет начальный темп'); click(30, 21, 'КАССА САЛУНА')
+        s.wait('Убери 1 ряд'); s.snapshot('tetris')
+        tetris_code = code()
+        s.send(b'c', 'Скопировано'); assert code() == tetris_code
         s.send(b'q', 'Выбери игру')
         click(30, 17, 'Меняет долю мин')
         for _ in range(4): click(30, 17, 'Размер:')
@@ -75,7 +78,7 @@ def main():
         s.send(b'q', 'Выбери игру'); click(30, 23, 'Управление')
         s.wait('ПКМ / F — флаг'); s.snapshot('help')
         s.send(b'\x1b', 'Выбери игру')
-        print('PASS: 100x40, all modules, Pong keyboard/mouse, level selection, replay/fresh seed, P1/P2/CRC, copy/footer/pause, extreme two bots, clean panels')
+        print('PASS: 100x40, real Tetris and Pong, Minesweeper stub, Pong keyboard/mouse, level selection, replay/fresh seed, P1/P2/CRC, copy/footer/pause, extreme two bots, clean panels')
     with Qemu(debug=True, port=5556):
         debugger = shutil.which('xtensa-esp32-elf-gdb'); assert debugger
         script = artifacts / 'step.gdb'

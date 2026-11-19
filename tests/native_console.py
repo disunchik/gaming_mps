@@ -65,6 +65,14 @@ def worker(report):
         wait('Выбери игру')
         session.snapshot('native-main')
         assert key(40) == b'\x1b[B'
+        mouse(30, 15, 1); mouse(30, 15, 0)
+        wait('Меняет начальный темп')
+        mouse(30, 21, 1); mouse(30, 21, 0)
+        wait('КАССА САЛУНА')
+        session.snapshot('native-tetris')
+        key(80, 'p'); wait('Пауза')
+        key(80, 'p'); wait('КАССА САЛУНА')
+        key(81, 'q'); wait('Выбери игру')
         mouse(30, 19, 1); mouse(30, 19, 0)
         wait('Меняет только точность')
         mouse(30, 21, 1); mouse(30, 21, 0)
@@ -83,7 +91,7 @@ def worker(report):
         session.snapshot('native-windows')
         key(81, 'q'); wait('Выбери игру')
     Path(report).write_text(json.dumps({'passed': True,
-        'checks': ['ReadConsoleInputW', 'WriteConsoleInputW', 'WriteConsoleW', 'ReadConsoleOutputCharacterW: all 100x40 cells match firmware', 'arrow', 'left click', 'right click', 'hover', 'pause', 'return', 'QEMU UART', 'real clipboard copy and read-back; original formats restored']}, indent=2), encoding='utf-8')
+        'checks': ['ReadConsoleInputW', 'WriteConsoleInputW', 'WriteConsoleW', 'ReadConsoleOutputCharacterW: all 100x40 cells match firmware', 'arrow', 'left click', 'right click', 'hover', 'pause', 'return', 'QEMU UART', 'Tetris field, glyphs and pause', 'real clipboard copy and read-back; original formats restored']}, indent=2), encoding='utf-8')
 
 
 def main():
@@ -109,7 +117,7 @@ def main():
         raise
     content = json.loads(report.read_text(encoding='utf-8')) if report.exists() else {}
     assert result == 0 and content.get('passed'), content
-    print('PASS: native Windows console 100x40, mouse/keyboard -> Pong and real clipboard read-back')
+    print('PASS: native Windows console 100x40, mouse/keyboard -> Tetris and Pong, real clipboard read-back')
 
 
 if __name__ == '__main__':

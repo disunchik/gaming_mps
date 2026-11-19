@@ -1,5 +1,6 @@
 """Read back a real clipboard write while restoring all original clipboard formats."""
 import ctypes as C
+import time
 from ctypes import wintypes as W
 from clipboard import copy_text
 
@@ -19,9 +20,17 @@ def verified_copy(text):
     ole.OleDuplicateData.argtypes = [W.HANDLE, W.WORD, W.UINT]; ole.OleDuplicateData.restype = W.HANDLE
     kernel.GlobalLock.argtypes = [W.HANDLE]; kernel.GlobalLock.restype = C.c_void_p
     kernel.GlobalUnlock.argtypes = [W.HANDLE]
+    def open_clipboard():
+        """Wait briefly for concurrent Windows clipboard readers, without clearing it."""
+        deadline = time.monotonic() + 2
+        while not user.OpenClipboard(window):
+            assert time.monotonic() < deadline, 'Cannot open Windows clipboard within 2 seconds'
+            time.sleep(0.01)
+
     saved = []
     window = user.CreateWindowExW(0, 'STATIC', 'clipboard test restore', 0, 0, 0, 0, 0, W.HWND(-3), None, None, None)
-    assert window and user.OpenClipboard(window)
+    assert window
+    open_clipboard()
     try:
         fmt = user.EnumClipboardFormats(0)
         while fmt:
@@ -35,7 +44,7 @@ def verified_copy(text):
         user.CloseClipboard()
     try:
         assert copy_text(text), 'SetClipboardData failed'
-        assert user.OpenClipboard(window)
+        open_clipboard()
         try:
             handle = user.GetClipboardData(13)
             pointer = kernel.GlobalLock(handle)
@@ -46,7 +55,7 @@ def verified_copy(text):
             user.CloseClipboard()
         return True
     finally:
-        assert user.OpenClipboard(window), 'Cannot restore clipboard'
+        open_clipboard()
         try:
             assert user.EmptyClipboard()
             for fmt, handle in saved:

@@ -299,7 +299,7 @@ void Menu::draw(Screen& s) const {
                          selected_ == i ? Theme::wood : Theme::paper);
         }
         text(21, "* --------------------------------------------- *", Theme::paperMuted);
-        text(22, "Тетрис и сапёр — в разработке", Theme::paperMuted);
+        text(22, "Сапёр — в разработке", Theme::paperMuted);
     } else if (page_ == Page::Settings) {
         title(gameName(game_));
         option(s, 0, 9, std::string("Сложность: < ") + difficultyName(difficulties_[static_cast<unsigned>(game_)]) + " >");
@@ -317,7 +317,10 @@ void Menu::draw(Screen& s) const {
         }
         option(s, rows() - 2, 16, "Начать игру");
         option(s, rows() - 1, 18, "Назад");
-        text(22, game_ == GameId::Pong ? "Матч до 5 очков. После уровня 3 — бонус." : "Сейчас запустится проверка ввода, без механики", Theme::paperMuted);
+        const char* summary = game_ == GameId::Pong ? "Матч до 5 очков. После уровня 3 — бонус."
+            : game_ == GameId::Tetris ? "Убирай ряды. Каждые 10 линий — новый уровень."
+            : "Сейчас запустится проверка ввода, без механики";
+        text(22, summary, Theme::paperMuted);
     } else if (page_ == Page::Code) {
         title("Играть по коду");
         text(10, "Введи код друга — сыграй в тех же условиях");

@@ -41,7 +41,7 @@ def main():
         assert all(name in s.model.text() for name in ['01 / КОВБОЙ ПАША', '02 / КОВБОЙ ТЁМА', '03 / КОВБОЙ ДИМА'])
         assert 'разработке' not in s.model.text()
         assert all(cell[0] == ' ' and cell[2] == 234 for y, row in enumerate(wide.cells)
-                   for x, cell in enumerate(row) if x >= 100 or y >= 40)
+                   for x, cell in enumerate(row) if x >= 100 or y >= 44)
         wide.snapshot(artifacts / 'screens', 'viewport-wide')
         click(30, 23, 'КРАТКАЯ СВОДКА САЛУНА')
         assert s.model.text().count('__|__') == 2
@@ -71,7 +71,7 @@ def main():
         s.wait('Матч до 5 очков', condition=lambda m: 0 <= player_left(m) < start)
         s.snapshot('pong')
         s.send(b'c', 'Скопировано'); assert code() == original
-        click(35, 38, 'Скопировано')
+        click(35, 42, 'Скопировано')
         s.send(b'p', 'Пауза'); s.snapshot('pause')
         click(30, 22, 'Скопировано')  # Copy item in pause, not a resume.
         s.wait('Пауза')
@@ -100,7 +100,7 @@ def main():
         s.send(b'q', 'Выбери игру'); click(30, 23, 'КРАТКАЯ СВОДКА САЛУНА')
         s.wait('ПКМ / F — бандана'); s.snapshot('help')
         s.send(b'\x1b', 'Выбери игру')
-        print('PASS: 100x40, real Tetris and Pong, Minesweeper stub, Pong keyboard/mouse, level selection, replay/fresh seed, P2/CRC and P1 rejected, copy/footer/pause, extreme two bots, clean panels, full viewport background')
+        print('PASS: 100x44, three playable games, Pong keyboard/mouse, level selection, replay/fresh seed, P2/CRC and P1 rejected, copy/footer/pause, extreme two cowboys, clean panels, full viewport background')
     with Qemu(debug=True, port=5556):
         debugger = shutil.which('xtensa-esp32-elf-gdb'); assert debugger
         script = artifacts / 'step.gdb'

@@ -139,7 +139,7 @@ def worker(report):
         assert 'P2-4SW5-CD0J-0228E' in model.text()
         key(81, 'й'); wait('Выбери игру')
     Path(report).write_text(json.dumps({'passed': True,
-        'checks': ['ReadConsoleInputW', 'WriteConsoleInputW', 'WriteConsoleW', 'ReadConsoleOutputCharacterW: all 100x40 cells match firmware', 'continuous hold without repeat, key-up, lost focus, release while paused', 'arrow', 'left click', 'right click', 'hover', 'pause', 'return', 'QEMU UART', 'Tetris field, glyphs and pause', 'RU and EN P/Q/R/C, physical WASD, RU code entry', 'real clipboard copy and read-back; original formats restored']}, indent=2), encoding='utf-8')
+        'checks': ['ReadConsoleInputW', 'WriteConsoleInputW', 'WriteConsoleW', 'ReadConsoleOutputCharacterW: all 100x44 cells match firmware', 'continuous hold without repeat, key-up, lost focus, release while paused', 'arrow', 'left click', 'right click', 'hover', 'pause', 'return', 'QEMU UART', 'Tetris field, glyphs and pause', 'RU and EN P/Q/R/C, physical WASD, RU code entry', 'real clipboard copy and read-back; original formats restored']}, indent=2), encoding='utf-8')
 
 
 def main():
@@ -165,7 +165,7 @@ def main():
         raise
     content = json.loads(report.read_text(encoding='utf-8')) if report.exists() else {}
     assert result == 0 and content.get('passed'), content
-    print('PASS: native Windows console 100x40, mouse/keyboard -> Tetris and Pong, real clipboard read-back; RU/EN, held movement, release and focus loss')
+    print('PASS: native Windows console 100x44, mouse/keyboard -> Tetris and Pong, real clipboard read-back; RU/EN, held movement, release and focus loss')
 
 
 if __name__ == '__main__':

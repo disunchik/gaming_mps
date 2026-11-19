@@ -124,13 +124,13 @@ if os.name == 'nt':
             kernel.GetConsoleScreenBufferInfo(self.output, C.byref(info))
             width = info.window.Right - info.window.Left + 1
             height = info.window.Bottom - info.window.Top + 1
-            if width < 100 or height < 40:
-                kernel.SetConsoleScreenBufferSize(self.output, Coord(max(100, info.size.X), max(40, info.size.Y)))
-                window = SmallRect(0, 0, max(100, width) - 1, max(40, height) - 1)
+            if width < 100 or height < 44:
+                kernel.SetConsoleScreenBufferSize(self.output, Coord(max(100, info.size.X), max(44, info.size.Y)))
+                window = SmallRect(0, 0, max(100, width) - 1, max(44, height) - 1)
                 kernel.SetConsoleWindowInfo(self.output, True, C.byref(window))
                 kernel.GetConsoleScreenBufferInfo(self.output, C.byref(info))
-                if info.window.Right - info.window.Left + 1 < 100 or info.window.Bottom - info.window.Top + 1 < 40:
-                    raise RuntimeError('Увеличь терминал минимум до 100 столбцов и 40 строк.')
+                if info.window.Right - info.window.Left + 1 < 100 or info.window.Bottom - info.window.Top + 1 < 44:
+                    raise RuntimeError('Увеличь терминал минимум до 100 столбцов и 44 строки.')
             if not kernel.SetConsoleMode(self.output, self.output_mode.value | 0x4):
                 raise C.WinError(C.get_last_error())
             mode = (self.input_mode.value | 0x8 | 0x10 | 0x80) & ~(0x2 | 0x4 | 0x40 | 0x200)

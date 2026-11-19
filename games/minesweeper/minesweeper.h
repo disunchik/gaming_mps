@@ -26,11 +26,11 @@ private:
         bool operator==(Point other) const { return x == other.x && y == other.y; }
     };
 
-    /** @brief Положение поля и размер клетки в символах терминала. */
+    /** @brief Положение и размер всей доски в символах терминала. */
     struct Layout {
         Point origin; ///< Левый верхний угол клеток внутри Screen.
-        int cellWidth; ///< Ширина клетки с вертикальным швом.
-        int cellHeight; ///< Высота клетки в строках.
+        int width; ///< Ширина доски без рамки.
+        int height; ///< Высота доски без рамки.
     };
 
     /** @brief Содержимое и видимое состояние одной клетки. */
@@ -44,7 +44,6 @@ private:
     static constexpr int maxCells = 16 * 16; ///< Ёмкость поля и очереди раскрытия.
     std::array<Cell, maxCells> cells_{}; ///< Клетки текущего поля, по строкам.
     Result result_{}; ///< Результат, который считывает оболочка.
-    Difficulty difficulty_ = Difficulty::Normal; ///< Выбранная сложность.
     std::uint32_t seed_ = 0; ///< Начальное число для раскладки.
     int size_ = 8; ///< Сторона квадратного поля.
     int mines_ = 10; ///< Заданное число мин.

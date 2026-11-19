@@ -11,13 +11,13 @@ sys.path.insert(0, str(ROOT / 'tools'))
 
 
 def console_rows(terminal):
-    """Read the visible 100x40 characters from the real console, not a VT model."""
+    """Read the visible 100x44 characters from the real console, not a VT model."""
     from terminal import C, W, kernel, Coord, BufferInfo
     kernel.ReadConsoleOutputCharacterW.argtypes = [W.HANDLE, W.LPWSTR, W.DWORD, Coord, C.POINTER(W.DWORD)]
     info = BufferInfo()
     assert kernel.GetConsoleScreenBufferInfo(terminal.output, C.byref(info))
     rows = []
-    for y in range(40):
+    for y in range(44):
         buffer = C.create_unicode_buffer(101)
         count = W.DWORD()
         assert kernel.ReadConsoleOutputCharacterW(terminal.output, buffer, 100,

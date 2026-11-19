@@ -9,7 +9,7 @@
 /** @brief Меню, настройки, игра, пауза, результаты и ввод кода. */
 class Menu {
 public:
-    /** @brief Источник seed только для новой партии из меню. */
+    /** @brief Источник seed для новой партии. */
     using Seed = std::uint32_t (*)();
     /** @brief Подключает три игры и источник новых стартовых условий. */
     Menu(Game& tetris, Game& minesweeper, Game& pong, Seed seed);
@@ -27,7 +27,7 @@ public:
     bool takePasteRequest();
 private:
     /** @brief Экраны оболочки. */
-    enum class Page { Main, Settings, Playing, Paused, Results, Code, CodeConfirm, Help };
+    enum class Page { Main, Settings, Playing, Paused, Results, BoardReview, Code, CodeConfirm, Help };
     std::array<Game*, 3> games_; ///< Подключённые игры в порядке GameId.
     Seed seed_; ///< Источник новых seed.
     Page page_ = Page::Main; ///< Текущий экран.
@@ -52,6 +52,7 @@ private:
     static constexpr int settingsLevelY_ = 19; ///< Абсолютная строка уровня/размера.
     static constexpr int settingsStartY_ = 23; ///< Абсолютная строка запуска.
     static constexpr int settingsBackY_ = 25; ///< Абсолютная строка возврата.
+    static constexpr int reviewFirstY_ = Screen::fieldY + Screen::panelHeight - 5; ///< Первая кнопка просмотра.
     static constexpr unsigned sceneryStepMs_ = 160; ///< Время сдвига перекати-поля на столбец.
     static constexpr unsigned sceneryPeriodMs_ = 106 * sceneryStepMs_; ///< Полный оборот фона.
     unsigned sceneryMs_ = 0; ///< Фаза фона; не относится к игровому времени или RNG.
@@ -64,6 +65,8 @@ private:
     void home();
     /** @brief Запускает или повторяет полностью сохранённые стартовые условия. */
     void start();
+    /** @brief Запускает Сапёр с прежним размером и сложностью и новым seed. */
+    void startFreshMinefield();
     /** @brief Действие выбранного пункта текущего экрана. */
     void activate();
     /** @brief Определяет строку кнопки под указателем. */
@@ -72,10 +75,16 @@ private:
     int rows() const;
     /** @brief Проверяет наличие следующего конечного уровня. */
     bool hasNext() const;
+    /** @brief Проверяет, доступен ли экран текущей партии. */
+    bool onGamePage() const;
+    /** @brief Возвращает заголовок по исходу партии. */
+    const char* resultTitle() const;
     /** @brief Формирует код именно стартовых условий, дополняя первый ход сапёра. */
     std::string currentCode() const;
     /** @brief Рисует выбранную или обычную строку меню. */
     void option(Screen& screen, int row, int y, std::string_view text) const;
+    /** @brief Рисует кнопки просмотра поля в нижней части панели. */
+    void reviewButtons(Screen& screen) const;
     /** @brief Рисует настройку с постоянными зонами уменьшения и увеличения. */
     void setting(Screen& screen, int row, int y, std::string_view label, std::string_view value) const;
     /** @brief Рисует маленькое перекати-поле перед непрозрачной рамкой меню. */

@@ -73,6 +73,10 @@ void Screen::cell(int x, int y, Color foreground, Color background, char32_t gly
     if (x >= 0 && x < width) put(x + 2, y + 5, glyph, foreground, background);
     if (x + 1 >= 0 && x + 1 < width) put(x + 3, y + 5, U' ', foreground, background);
 }
+void Screen::glyph(int x, int y, Color foreground, Color background, char32_t value) {
+    if (x >= 0 && x < width && y >= 0 && y < height)
+        put(x + fieldX, y + fieldY, value, foreground, background);
+}
 void Screen::canvasFrame(int x, int y, int w, int h, Color foreground) {
     if (w < 2 || h < 2) return;
     for (int i = 1; i < w - 1; ++i) {

@@ -235,10 +235,10 @@ static void screenTests() {
     screen.begin();
     screen.text(-2, 0, "XXVISIBLE");
     screen.text(72, 0, "OUTSIDE");
-    screen.panelText(30, "OUTSIDE");
+    screen.panelText(Screen::panelHeight, "OUTSIDE");
     screen.panelTextAt(-2, 1, "XXPANEL");
     screen.panelTextAt(21, 1, "OUTSIDE");
-    screen.canvasText(99, 39, "OUTSIDE");
+    screen.canvasText(Screen::canvasWidth - 1, Screen::canvasHeight - 1, "OUTSIDE");
     CHECK(screen.plain().find("PANEL") != std::string::npos);
     CHECK(screen.plain().find("VISIBLE") != std::string::npos);
     CHECK(screen.plain().find("OUTSIDE") == std::string::npos);
@@ -258,7 +258,7 @@ static void screenTests() {
     menu.update(66 * 160); CHECK(view(menu).find("\\|/") != std::string::npos);
     menu.update(20 * 160); CHECK(view(menu) == first);
     CHECK(tetris.result().timeMs == 0 && pong.result().timeMs == 0);
-    CHECK(Screen::boardX(16) == 20 && Screen::boardY(16) == 7);
+    CHECK(Screen::boardX(16) == 20 && Screen::boardY(16) == 9);
 }
 
 

@@ -17,7 +17,7 @@ CODE = re.compile(r"P2-(?:[0-9A-Z]{4}-){2}[0-9A-Z]{5}")
 DEMO_P2 = "P2-0G00-0000-02RGG"
 
 # Screen::fieldX, fieldY, width and height from the shared screen contract.
-FIELD_X, FIELD_Y, FIELD_WIDTH, FIELD_HEIGHT = 2, 5, 72, 30
+FIELD_X, FIELD_Y, FIELD_WIDTH, FIELD_HEIGHT = 2, 5, 72, 34
 BOARD_COLUMNS, BOARD_ROWS, CELL_WIDTH = 10, 20, 2
 
 # Position/rotate, descend that many steps, expect this total number of cleared lines.

@@ -33,14 +33,14 @@ public:
     /** @brief Возвращает снимок символов канваса без ANSI для проверок. */
     std::string plain() const;
     static constexpr int canvasWidth = 100; ///< Ширина полного терминала.
-    static constexpr int canvasHeight = 40; ///< Высота полного терминала.
+    static constexpr int canvasHeight = 44; ///< Высота полного терминала.
     static constexpr int fieldX = 2; ///< Начало поля по горизонтали.
     static constexpr int fieldY = 5; ///< Начало поля по вертикали.
     static constexpr int panelX = 77; ///< Начало боковой панели.
     static constexpr int width = 72; ///< Ширина содержимого игрового поля.
-    static constexpr int height = 30; ///< Высота содержимого игрового поля.
+    static constexpr int height = 34; ///< Высота содержимого игрового поля.
     static constexpr int panelWidth = 21; ///< Ширина содержимого боковой панели.
-    static constexpr int panelHeight = 30; ///< Высота содержимого боковой панели.
+    static constexpr int panelHeight = 34; ///< Высота содержимого боковой панели.
 
     /** @brief Выводит строку UTF-8 с одноколоночными символами внутри поля. */
     void text(int x, int y, std::string_view value,
@@ -55,6 +55,8 @@ public:
     /** @brief Рисует glyph и пробел в двух соседних столбцах; x задан в символах. */
     void cell(int x, int y, Color foreground, Color background,
               char32_t glyph = U' ');
+    /** @brief Рисует один глиф без дополнительного пробела. */
+    void glyph(int x, int y, Color foreground, Color background, char32_t value);
     /** @brief Выводит строку внутри боковой панели, начиная с колонки 0. */
     void panelText(int row, std::string_view value, Color foreground = Theme::text);
     /** @brief Выводит текст с локальным x внутри панели; обрезает по её границам. */

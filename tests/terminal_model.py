@@ -7,7 +7,7 @@ from pathlib import Path
 
 class TerminalModel:
     """Recover actual emulated screen cells from fragmented UART output."""
-    def __init__(self, width=100, height=40, background=234):
+    def __init__(self, width=100, height=44, background=234):
         """Start with configurable viewport geometry and the terminal default background."""
         self.decoder = codecs.getincrementaldecoder('utf-8')('replace')
         self.width, self.height = width, height

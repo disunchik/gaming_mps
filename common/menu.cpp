@@ -31,9 +31,25 @@ void Menu::start() {
     page_ = Page::Playing;
     skipUpdate_ = true;
 }
+void Menu::startFreshMinefield() {
+    const auto seed = seed_();
+    settings_.seed = seed == settings_.seed ? seed + 1u : seed;
+    settings_.firstX = settings_.firstY = -1;
+    start();
+}
 bool Menu::hasNext() const {
     return result_.state == State::Won && ((game_ == GameId::Minesweeper && settings_.level < 5)
         || (game_ == GameId::Pong && settings_.level < 4));
+}
+bool Menu::onGamePage() const {
+    return page_ == Page::Playing || page_ == Page::Paused || page_ == Page::Results ||
+           page_ == Page::BoardReview;
+}
+const char* Menu::resultTitle() const {
+    if (game_ == GameId::Pong) return result_.state == State::Won ? "Соперник переигран" : "Проиграл дуэль";
+    if (result_.state == State::Lost)
+        return game_ == GameId::Minesweeper ? "Не заметил растяжку" : "Партия окончена";
+    return game_ == GameId::Minesweeper ? "Поле зачищено" : "Уровень пройден";
 }
 std::string Menu::currentCode() const {
     Settings recorded = settings_;
@@ -48,12 +64,18 @@ int Menu::rows() const {
         case Page::Main: return 5;
         case Page::Settings: return game_ == GameId::Tetris ? 3 : 4;
         case Page::Paused: return 4;
-        case Page::Results: return hasNext() ? 3 : 2;
+        case Page::Results: return 2 + hasNext() + (game_ == GameId::Minesweeper ? 2 : 0);
+        case Page::BoardReview: return 2;
         case Page::CodeConfirm: return 2;
         default: return 0;
     }
 }
 int Menu::hit(int x, int y) const {
+    if (page_ == Page::BoardReview) {
+        if (x <= Screen::panelX || x >= Screen::panelX + Screen::panelWidth - 1) return -1;
+        const int offset = y - reviewFirstY_;
+        return (offset == 0 || offset == 2) ? offset / 2 : -1;
+    }
     x -= 10; y -= 5;
     if (x < 9 || x >= 71) return -1;
     switch (page_) {
@@ -114,7 +136,15 @@ void Menu::activate() {
             settings_.firstX = settings_.firstY = -1;
             start();
         } else if (selected_ == rows() - 1) home();
+        else if (game_ == GameId::Minesweeper && selected_ == rows() - 2) startFreshMinefield();
+        else if (game_ == GameId::Minesweeper && selected_ == rows() - 3) {
+            page_ = Page::BoardReview;
+            selected_ = 0;
+        }
         else start();
+    } else if (page_ == Page::BoardReview) {
+        if (selected_ == 0) startFreshMinefield();
+        else { page_ = Page::Results; selected_ = rows() - 3; }
     } else if (page_ == Page::CodeConfirm) {
         if (!selected_) start();
         else { page_ = Page::Code; error_.clear(); }
@@ -134,9 +164,9 @@ void Menu::handle(const Input& input) {
         }
         return;
     }
-    const bool gamePage = page_ == Page::Playing || page_ == Page::Paused || page_ == Page::Results;
+    const bool gamePage = onGamePage();
     if (input.type == InputType::Copy || (gamePage && input.type == InputType::PointerLeft &&
-        input.y == 38 && input.x >= 31 && input.x < 46)) {
+        input.y == Screen::canvasHeight - 2 && input.x >= 31 && input.x < 46)) {
         if (gamePage) copy();
         return;
     }
@@ -170,17 +200,18 @@ void Menu::handle(const Input& input) {
     }
     if (input.type == InputType::Back) {
         if (page_ == Page::CodeConfirm) { page_ = Page::Code; error_.clear(); }
+        else if (page_ == Page::BoardReview) { page_ = Page::Results; selected_ = rows() - 3; }
         else home();
         return;
     }
-    if (page_ == Page::Playing || page_ == Page::Paused || page_ == Page::Results) {
+    if (gamePage) {
         if (input.type == InputType::Restart) {
             if (game_ == GameId::Minesweeper && result_.firstX >= 0 && result_.firstY >= 0) {
                 settings_.firstX = result_.firstX; settings_.firstY = result_.firstY;
             }
             start(); return;
         }
-        if (input.type == InputType::Pause && page_ != Page::Results) {
+        if (input.type == InputType::Pause && (page_ == Page::Playing || page_ == Page::Paused)) {
             if (page_ == Page::Playing) { page_ = Page::Paused; selected_ = 0; }
             else { page_ = Page::Playing; skipUpdate_ = true; }
             return;
@@ -260,23 +291,34 @@ void Menu::option(Screen& s, int row, int y, std::string_view label) const {
     s.canvasText(20, y + 5, selected ? "*" : " ", foreground, background);
     s.canvasText(23, y + 5, label, foreground, background);
 }
+void Menu::reviewButtons(Screen& s) const {
+    constexpr const char* labels[] = {"Начать заново", "К результату"};
+    for (int row = 0; row < 2; ++row) {
+        const int y = reviewFirstY_ + 2 * row;
+        const Color background = selected_ == row ? Theme::wood : Theme::background;
+        const Color foreground = selected_ == row ? Theme::white : Theme::text;
+        s.canvasFill(Screen::panelX + 1, y, Screen::panelWidth - 2, 1, background);
+        s.canvasText(Screen::panelX + 2, y, labels[row], foreground, background);
+    }
+}
 void Menu::draw(Screen& s) const {
     s.begin();
     s.canvasText(1, 1, "Промпт, паяльник, три ствола", Theme::accent);
-    const bool gamePage = page_ == Page::Playing || page_ == Page::Paused || page_ == Page::Results;
-    if (gamePage) {
+    if (onGamePage()) {
         s.canvasText(1, 2, std::string(gameName(game_)) + " / " + difficultyName(settings_.difficulty)
                      + " / Уровень " + std::to_string(result_.level), Theme::muted);
-        s.canvasFrame(1, 4, 74, 32);
-        s.canvasFrame(76, 4, 23, 32);
+        s.canvasFrame(1, 4, 74, Screen::height + 2);
+        s.canvasFrame(76, 4, 23, Screen::panelHeight + 2);
         game().draw(s);
-        s.canvasText(1, 37, "Стрелки/WASD: движение   P: пауза   R: повтор   Q: в меню", Theme::muted);
+        s.canvasText(1, Screen::canvasHeight - 3, page_ == Page::BoardReview
+            ? "↑/↓: выбор   Enter/ЛКМ: подтвердить   Esc/Q: к результату"
+            : "Стрелки/WASD: движение   P: пауза   R: повтор   Q: в меню", Theme::muted);
         const auto code = currentCode();
-        s.canvasText(1, 38, code.empty() ? "Код после первого открытия" : "Код: " + code, Theme::accent);
-        if (!code.empty()) s.canvasText(31, 38, "Копировать [C]", Theme::cyan);
-        s.canvasText(50, 38, copyStatus_, Theme::muted);
+        s.canvasText(1, Screen::canvasHeight - 2, code.empty() ? "Код после первого открытия" : "Код: " + code, Theme::accent);
+        if (!code.empty()) s.canvasText(31, Screen::canvasHeight - 2, "Копировать [C]", Theme::cyan);
+        s.canvasText(50, Screen::canvasHeight - 2, copyStatus_, Theme::muted);
         if (page_ == Page::Paused) {
-            s.canvasFill(1, 4, 98, 32, Theme::background);
+            s.canvasFill(1, 4, 98, Screen::height + 2, Theme::background);
             s.canvasFill(18, 13, 64, 13, Theme::background);
             s.canvasFrame(18, 13, 64, 13, Theme::accent);
             s.canvasText(23, 15, "Пауза", Theme::accent);
@@ -285,16 +327,25 @@ void Menu::draw(Screen& s) const {
             option(s, 2, 17, "Копировать код");
             option(s, 3, 19, "В меню");
         } else if (page_ == Page::Results) {
-            s.canvasFill(1, 4, 98, 32, Theme::background);
-            s.canvasFill(18, 12, 64, 16, Theme::background);
-            s.canvasFrame(18, 12, 64, 16, Theme::accent);
-            s.canvasText(23, 14, result_.state == State::Won ? (game_ == GameId::Pong ? "Соперник переигран" : "Уровень пройден") : (game_ == GameId::Pong ? "Проиграл дуэль" : "Партия окончена"), Theme::accent);
-            s.canvasText(23, 16, "Счёт: " + std::to_string(result_.score));
+            const bool mines = game_ == GameId::Minesweeper;
+            const int height = mines ? 12 + 2 * rows() : 16;
+            s.canvasFill(1, 4, 98, Screen::height + 2, Theme::background);
+            s.canvasFill(18, 12, 64, height, Theme::background);
+            s.canvasFrame(18, 12, 64, height, Theme::accent);
+            s.canvasText(23, 14, resultTitle(), Theme::accent);
+            s.canvasText(23, 16, std::string(mines ? "Цена ошибки: " : "Счёт: ") + std::to_string(result_.score));
             s.canvasText(23, 17, "Игровое время: " + std::to_string(result_.timeMs / 1000) + " с");
             int row = 0;
             if (hasNext()) { option(s, row, 16 + 2 * row, game_ == GameId::Pong && settings_.level == 3 ? "Экстремальный уровень (2 ковбоя)" : "Следующий уровень"); ++row; }
             option(s, row, 16 + 2 * row, "Повторить те же условия"); ++row;
+            if (mines) {
+                option(s, row, 16 + 2 * row, "Посмотреть все поле"); ++row;
+                option(s, row, 16 + 2 * row, "Начать заново"); ++row;
+            }
             option(s, row, 16 + 2 * row, "В меню");
+        } else if (page_ == Page::BoardReview) {
+            s.panelText(22, resultTitle(), Theme::accent);
+            reviewButtons(s);
         }
         return;
     }
@@ -346,7 +397,7 @@ void Menu::draw(Screen& s) const {
     s.canvasText(38, 11, "*  САЛУН «ТРИ СТВОЛА»  *", Theme::white, Theme::wood);
     s.canvasText(1, 2, "Три игры. Один салун.", Theme::muted);
     if (page_ != Page::Code)
-        s.canvasText(1, 37, "Стрелки/WASD: выбор   Enter/ЛКМ: подтвердить   Esc/Q: назад", Theme::muted);
+        s.canvasText(1, Screen::canvasHeight - 3, "Стрелки/WASD: выбор   Enter/ЛКМ: подтвердить   Esc/Q: назад", Theme::muted);
     const auto text = [&s](int y, std::string_view label, Color color = Theme::ink) {
         s.canvasText(23, y + 5, label, color, Theme::paper);
     };
@@ -390,7 +441,7 @@ void Menu::draw(Screen& s) const {
         text(12, "> " + codeText_.substr(codeText_.size() > 54 ? codeText_.size() - 54 : 0));
         text(15, error_, Theme::paperError);
         text(19, "Формат: P2-XXXX-XXXX-XXXXX", Theme::paperMuted);
-        s.canvasText(1, 37, "↑ / Ctrl+V: вставить код   Enter: проверить   Esc: назад", Theme::muted);
+        s.canvasText(1, Screen::canvasHeight - 3, "↑ / Ctrl+V: вставить код   Enter: проверить   Esc: назад", Theme::muted);
     } else if (page_ == Page::CodeConfirm) {
         title("Код проверен");
         text(10, std::string(gameName(game_)) + " / " + difficultyName(settings_.difficulty));

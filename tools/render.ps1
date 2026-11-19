@@ -4,7 +4,9 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 $directory = Join-Path (Split-Path $PSScriptRoot -Parent) 'artifacts\screens'
 $grid = Get-Content (Join-Path $directory "$Name.json") -Raw -Encoding UTF8 | ConvertFrom-Json
-$bitmap = New-Object Drawing.Bitmap(1200, 960)
+$rows = $grid.Count
+$columns = $grid[0].Count
+$bitmap = New-Object Drawing.Bitmap(($columns * 12), ($rows * 24))
 $graphics = [Drawing.Graphics]::FromImage($bitmap)
 $graphics.TextRenderingHint = [Drawing.Text.TextRenderingHint]::ClearTypeGridFit
 $font = New-Object Drawing.Font('Consolas', 20, [Drawing.FontStyle]::Regular, [Drawing.GraphicsUnit]::Pixel)
@@ -24,8 +26,8 @@ function Brush([int]$index) {
     return $brushes[$index]
 }
 try {
-    for ($y = 0; $y -lt 40; $y++) {
-        for ($x = 0; $x -lt 100; $x++) {
+    for ($y = 0; $y -lt $rows; $y++) {
+        for ($x = 0; $x -lt $columns; $x++) {
             $cell = $grid[$y][$x]
             $graphics.FillRectangle((Brush $cell[2]), $x * 12, $y * 24, 12, 24)
             if ($cell[0] -ne ' ') {

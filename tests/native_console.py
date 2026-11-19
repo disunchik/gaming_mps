@@ -3,6 +3,7 @@ from pathlib import Path
 from native_output import console_rows
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -53,45 +54,84 @@ def worker(report):
             record.event.mouse.flags = flags
             return inject(record)
 
-        def key(virtual, character='\0'):
-            """Inject one native key-down record without UI automation."""
+        def key(virtual, character='\0', controls=0, down=True, tap=True):
+            """Inject native press/release records without UI automation."""
             record = InputRecord(); record.type = 1
-            record.event.key.down = True
+            record.event.key.down = down
             record.event.key.repeat = 1
             record.event.key.key = virtual
             record.event.key.character.UnicodeChar = character
-            return inject(record)
+            record.event.key.controls = controls
+            data = inject(record)
+            if down and tap and virtual in (37, 39, 65, 68):
+                record.event.key.down = False
+                inject(record)
+            return data
 
         wait('Выбери игру')
         session.snapshot('native-main')
         assert key(40) == b'\x1b[B'
         mouse(30, 15, 1); mouse(30, 15, 0)
         wait('Меняет начальный темп')
-        mouse(30, 21, 1); mouse(30, 21, 0)
+        mouse(30, 23, 1); mouse(30, 23, 0)
         wait('КАССА САЛУНА')
         session.snapshot('native-tetris')
-        key(80, 'p'); wait('Пауза')
-        key(80, 'p'); wait('КАССА САЛУНА')
-        key(81, 'q'); wait('Выбери игру')
+        tetris_code = re.search(r'P2-[0-9A-Z-]+', model.text())[0]
+        assert key(80, 'з') == b'p'; wait('Пауза')
+        assert key(67, 'с') == b'c'; wait('Скопировано')
+        assert key(82, 'к') == b'r'; wait('КАССА САЛУНА')
+        assert tetris_code in model.text()
+        assert key(81, 'й') == b'q'; wait('Выбери игру')
         mouse(30, 19, 1); mouse(30, 19, 0)
         wait('Меняет только точность')
-        mouse(30, 21, 1); mouse(30, 21, 0)
+        mouse(30, 23, 1); mouse(30, 23, 0)
         wait('Матч до 5 очков')
+        initial_left = player_left(model)
+        assert key(68, 'в', tap=False) == b'\x1b[911~d'
+        wait('Матч до 5 очков', condition=lambda m: player_left(m) >= initial_left + 5)
+        first = player_left(model)
+        session.pump(0.12)  # No repeated key-down records during this interval.
+        assert player_left(model) > first, (first, player_left(model))
+        assert key(68, down=False) == b'\x1b[912~'
+        session.pump(0.12); stopped = player_left(model)
+        session.pump(0.15); assert player_left(model) == stopped
+        # A lost-focus event releases the direction, without changing real focus.
+        key(65, 'ф', tap=False)
+        wait('Матч до 5 очков', condition=lambda m: player_left(m) < stopped)
+        focus = InputRecord(); focus.type = 16
+        assert inject(focus) == b'\x1b[912~'
+        session.pump(0.12); stopped = player_left(model)
+        session.pump(0.15); assert player_left(model) == stopped
         before = player_left(model)
         assert mouse(6, 20, 0, 1).startswith(b'\x1b[<35;')
         wait('Матч до 5 очков', condition=lambda m: 0 <= player_left(m) < before)
         assert mouse(20, 11, 2).startswith(b'\x1b[<2;')
         mouse(20, 11, 0)
+        key(68, 'd', tap=False)
         assert key(80, 'p') == b'p'
         wait('Пауза')
+        assert key(68, down=False) == b'\x1b[912~'
         assert key(67, 'c') == b'c'
         wait('Скопировано')
         wait('Пауза')
-        key(80, 'p'); wait('Матч до 5 очков')
+        key(80, 'P', controls=0x10); wait('Матч до 5 очков')
+        session.pump(0.1); stopped = player_left(model)
+        session.pump(0.15); assert player_left(model) == stopped
+        assert key(82, 'r') == b'r'
+        wait('Матч до 5 очков', condition=lambda m: player_left(m) == 33)
         session.snapshot('native-windows')
         key(81, 'q'); wait('Выбери игру')
+        mouse(30, 21, 1); mouse(30, 21, 0); wait('Введи код друга')
+        russian = dict(zip('QWERTYUIOPASDFGHJKLZXCVBNM', 'ЙЦУКЕНГШЩЗФЫВАПРОЛДЯЧСМИТЬ'))
+        for symbol in 'P2-4SW5-CD0J-0228E':
+            key(ord(symbol) if symbol != '-' else 189, russian.get(symbol, symbol).lower())
+        wait('p2-4sw5-cd0j-0228e')  # C remains code text rather than Copy here.
+        key(13, '\r'); wait('Код проверен')
+        key(13, '\r'); wait('Матч до 5 очков')
+        assert 'P2-4SW5-CD0J-0228E' in model.text()
+        key(81, 'й'); wait('Выбери игру')
     Path(report).write_text(json.dumps({'passed': True,
-        'checks': ['ReadConsoleInputW', 'WriteConsoleInputW', 'WriteConsoleW', 'ReadConsoleOutputCharacterW: all 100x40 cells match firmware', 'arrow', 'left click', 'right click', 'hover', 'pause', 'return', 'QEMU UART', 'Tetris field, glyphs and pause', 'real clipboard copy and read-back; original formats restored']}, indent=2), encoding='utf-8')
+        'checks': ['ReadConsoleInputW', 'WriteConsoleInputW', 'WriteConsoleW', 'ReadConsoleOutputCharacterW: all 100x40 cells match firmware', 'continuous hold without repeat, key-up, lost focus, release while paused', 'arrow', 'left click', 'right click', 'hover', 'pause', 'return', 'QEMU UART', 'Tetris field, glyphs and pause', 'RU and EN P/Q/R/C, physical WASD, RU code entry', 'real clipboard copy and read-back; original formats restored']}, indent=2), encoding='utf-8')
 
 
 def main():
@@ -117,7 +157,7 @@ def main():
         raise
     content = json.loads(report.read_text(encoding='utf-8')) if report.exists() else {}
     assert result == 0 and content.get('passed'), content
-    print('PASS: native Windows console 100x40, mouse/keyboard -> Tetris and Pong, real clipboard read-back')
+    print('PASS: native Windows console 100x40, mouse/keyboard -> Tetris and Pong, real clipboard read-back; RU/EN, held movement, release and focus loss')
 
 
 if __name__ == '__main__':

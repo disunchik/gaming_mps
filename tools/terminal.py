@@ -9,6 +9,49 @@ def mouse_bytes(button, x, y, release=False):
     return f'\x1b[<{button};{x + 1};{y + 1}{"m" if release else "M"}'.encode('ascii')
 
 
+def key_bytes(key, char='\0', repeat=1, controls=0):
+    """Encode physical Windows keys independently of the active keyboard layout."""
+    count = max(1, repeat)
+    if key == 121: return b'\x1d'  # F10 exits the transport.
+    arrows = {37: b'\x1b[D', 38: b'\x1b[A', 39: b'\x1b[C', 40: b'\x1b[B'}
+    if key in arrows: return arrows[key] * count
+    # Ctrl/Alt combinations keep their native character (including Ctrl+C/]).
+    if 65 <= key <= 90 and not controls & 0x0f:
+        char = chr(key if bool(controls & 0x10) != bool(controls & 0x80) else key + 32)
+    return char.encode('utf-8') * count if char and char != '\0' else b''
+
+
+class KeyboardInput:
+    """Encode press/release state; movement and timing stay on the ESP32."""
+    directions = {37: -1, 39: 1, 65: -1, 68: 1}
+
+    def __init__(self):
+        self.held = []
+
+    def axis_bytes(self):
+        direction = self.directions[self.held[-1]] if self.held else 0
+        return {-1: b'\x1b[910~', 1: b'\x1b[911~', 0: b'\x1b[912~'}[direction]
+
+    def feed(self, key, char='\0', down=True, repeat=1, controls=0):
+        """Keep ordinary taps for menus/Tetris alongside optional held events."""
+        state = b''
+        if key in self.directions:
+            if down and not controls & 0x0f:
+                if key not in self.held:
+                    self.held.append(key)
+                state = self.axis_bytes()
+            elif not down and key in self.held:
+                self.held.remove(key)
+                state = self.axis_bytes()
+        return state + (key_bytes(key, char, repeat, controls) if down else b'')
+
+    def release_all(self):
+        """Prevent a stuck direction when the console loses focus."""
+        active = bool(self.held)
+        self.held.clear()
+        return self.axis_bytes() if active else b''
+
+
 if os.name == 'nt':
     import ctypes as C
     from ctypes import wintypes as W
@@ -69,6 +112,7 @@ if os.name == 'nt':
             self.input_mode = W.DWORD()
             self.output_mode = W.DWORD()
             self.previous_buttons = 0
+            self.keyboard = KeyboardInput()
             self.codepage = kernel.GetConsoleOutputCP()
             self.decoder = codecs.getincrementaldecoder('utf-8')('replace')
 
@@ -123,13 +167,12 @@ if os.name == 'nt':
             count = W.DWORD()
             if not kernel.ReadConsoleInputW(self.input, C.byref(record), 1, C.byref(count)):
                 raise C.WinError(C.get_last_error())
-            if record.type == 1 and record.event.key.down:
+            if record.type == 1:
                 event = record.event.key
-                if event.key == 121: return b'\x1d'  # F10 exits the transport.
-                arrows = {37: b'\x1b[D', 38: b'\x1b[A', 39: b'\x1b[C', 40: b'\x1b[B'}
-                if event.key in arrows: return arrows[event.key] * max(1, event.repeat)
-                char = event.character.UnicodeChar
-                return char.encode('utf-8') * max(1, event.repeat) if char and char != '\0' else b''
+                return self.keyboard.feed(event.key, event.character.UnicodeChar,
+                                          bool(event.down), event.repeat, event.controls)
+            if record.type == 16 and not record.event.raw[0]:
+                return self.keyboard.release_all()
             if record.type == 2:
                 event = record.event.mouse
                 info = BufferInfo()

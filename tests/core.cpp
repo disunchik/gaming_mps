@@ -64,6 +64,9 @@ static void inputTests() {
     CHECK(feed("c", true)); CHECK(event.type == InputType::Text);
     CHECK(feed("\x1b[901~")); CHECK(event.type == InputType::CopySucceeded);
     CHECK(feed("\x1b[902~")); CHECK(event.type == InputType::CopyFailed);
+    CHECK(feed("\x1b[910~")); CHECK(event.type == InputType::HeldLeft);
+    CHECK(feed("\x1b[911~")); CHECK(event.type == InputType::HeldRight);
+    CHECK(feed("\x1b[912~", true)); CHECK(event.type == InputType::HorizontalReleased);
     CHECK(feed("r")); CHECK(event.type == InputType::Restart);
     CHECK(feed("q", true)); CHECK(event.type == InputType::Text && event.character == U'q');
     CHECK(feed("\r")); CHECK(!feed("\n"));
@@ -80,9 +83,11 @@ static void codeTests() {
     GameId game = GameId::Tetris;
     Settings decoded;
     std::string error;
-    CHECK(decodeCode("p1 041020 r00007 gnhm2b zzyzj4", game, decoded, error));
+    CHECK(decodeCode("p2 4sw5 cd0j 0228e", game, decoded, error));
     CHECK(game == GameId::Pong && decoded.seed == settings.seed && decoded.level == 3);
     const Settings before = decoded;
+    CHECK(!decodeCode("P1-041020-R00007-GNHM2B-ZZYZJ4", game, decoded, error));
+    CHECK(error == "Нужен полный код P2" && decoded.seed == before.seed && game == GameId::Pong);
     CHECK(!decodeCode("P1-041020-R00007-GNHM2B-ZZYZJ5", game, decoded, error));
     CHECK(decoded.seed == before.seed && decoded.level == before.level && !error.empty());
     CHECK(!decodeCode("P2-041020-R00007-GNHM2B-ZZYZJ4", game, decoded, error));
@@ -130,6 +135,8 @@ static void menuTests() {
     press(menu, InputType::Pause); menu.update(60000);
     const auto handled = tetris.handled;
     press(menu, InputType::Right); CHECK(tetris.handled == handled);
+    press(menu, InputType::HorizontalReleased);
+    CHECK(tetris.last.type == InputType::HorizontalReleased && tetris.handled == handled + 1);
     CHECK(tetris.current.timeMs == 1000);
     press(menu, InputType::Pause); menu.update(60000); menu.update(17);
     CHECK(tetris.current.timeMs == 1017);
@@ -149,8 +156,10 @@ static void menuTests() {
     CHECK(view(menu).find("Партия окончена") != std::string::npos);
     press(menu, InputType::Back);
     press(menu, InputType::Down); press(menu, InputType::Confirm); // Mines settings.
-    press(menu, InputType::PointerLeft, 30, 17); // Click size: 8 -> 10.
-    press(menu, InputType::PointerLeft, 30, 21);
+    press(menu, InputType::PointerLeft, 64, 19); // Size: 8 -> 10.
+    press(menu, InputType::PointerLeft, 42, 19); // Back to 8.
+    press(menu, InputType::PointerLeft, 64, 19); // Again 10.
+    press(menu, InputType::PointerLeft, 30, 23);
     CHECK(mines.settings.level == 2);
     menu.update(0);
     mines.current.firstX = 3; mines.current.firstY = 4; mines.current.state = State::Won;
@@ -165,7 +174,7 @@ static void menuTests() {
     press(menu, InputType::Back);
     press(menu, InputType::PointerLeft, 30, 21); // Play by code.
     CHECK(menu.textMode());
-    for (char c : std::string("P1-041020-R00007-GNHM2B-ZZYZJ4")) {
+    for (char c : std::string("P2-4SW5-CD0J-0228E")) {
         Input input; input.type = InputType::Text; input.character = c; menu.handle(input);
     }
     press(menu, InputType::Confirm); CHECK(!menu.textMode());
@@ -184,6 +193,33 @@ static void menuTests() {
     press(menu, InputType::CopySucceeded); CHECK(view(menu).find("Скопировано") != std::string::npos);
 }
 
+/** @brief Проверяет обе стрелки мыши во всех настройках, включая границы. */
+static void mouseSettingsTests() {
+    for (int id = 0; id < 3; ++id) {
+        Fake tetris, mines, pong;
+        Menu menu(tetris, mines, pong, seed);
+        const auto main = view(menu);
+        CHECK(main.find("01 / КОВБОЙ ПАША") != std::string::npos);
+        CHECK(main.find("02 / КОВБОЙ ТЁМА") != std::string::npos);
+        CHECK(main.find("03 / КОВБОЙ ДИМА") != std::string::npos);
+        CHECK(main.find("разработке") == std::string::npos);
+        press(menu, InputType::PointerLeft, 30, 15 + 2 * id);
+        for (int i = 0; i < 4; ++i) press(menu, InputType::PointerLeft, 42, 16);
+        press(menu, InputType::PointerLeft, 30, 23);
+        Fake* game = id == 0 ? &tetris : id == 1 ? &mines : &pong;
+        CHECK(game->settings.difficulty == Difficulty::Easy);
+        press(menu, InputType::Back); press(menu, InputType::Confirm);
+        for (int i = 0; i < 4; ++i) press(menu, InputType::PointerLeft, 64, 16);
+        if (id) {
+            for (int i = 0; i < 6; ++i) press(menu, InputType::PointerLeft, 64, 19);
+            press(menu, InputType::PointerLeft, 42, 19);
+        }
+        press(menu, InputType::PointerLeft, 30, 23);
+        CHECK(game->settings.difficulty == Difficulty::Hard);
+        CHECK(game->settings.level == (id == 1 ? 4u : id == 2 ? 2u : 1u));
+    }
+}
+
 /** @brief Проверяет отсечение вывода, отсутствие лишних кадров и чистоту draw. */
 static void screenTests() {
     std::string bytes;
@@ -192,7 +228,10 @@ static void screenTests() {
     screen.text(-2, 0, "XXVISIBLE");
     screen.text(72, 0, "OUTSIDE");
     screen.panelText(30, "OUTSIDE");
+    screen.panelTextAt(-2, 1, "XXPANEL");
+    screen.panelTextAt(21, 1, "OUTSIDE");
     screen.canvasText(99, 39, "OUTSIDE");
+    CHECK(screen.plain().find("PANEL") != std::string::npos);
     CHECK(screen.plain().find("VISIBLE") != std::string::npos);
     CHECK(screen.plain().find("OUTSIDE") == std::string::npos);
     screen.flush(); CHECK(!bytes.empty()); bytes.clear(); screen.flush(); CHECK(bytes.empty());
@@ -200,11 +239,20 @@ static void screenTests() {
     Menu menu(tetris, mines, pong, seed);
     menu.draw(screen); const auto first = screen.plain(); screen.flush(); bytes.clear();
     menu.draw(screen); screen.flush(); CHECK(bytes.empty() && screen.plain() == first);
+    // Scenery moves outside the notice, is occluded by it, and wraps without gameplay.
+    CHECK(first.find("\\|/") != std::string::npos);
+    menu.update(160); CHECK(view(menu) != first);
+    menu.update(19 * 160);
+    CHECK(view(menu).find("\\|/") == std::string::npos);
+    CHECK(view(menu).find("-*-") == std::string::npos);
+    menu.update(66 * 160); CHECK(view(menu).find("\\|/") != std::string::npos);
+    menu.update(20 * 160); CHECK(view(menu) == first);
+    CHECK(tetris.result().timeMs == 0 && pong.result().timeMs == 0);
     CHECK(Screen::boardX(16) == 20 && Screen::boardY(16) == 7);
 }
 
 /** @brief Выполняет все проверки общей основы. */
 int main() {
-    inputTests(); codeTests(); menuTests(); screenTests();
+    inputTests(); codeTests(); menuTests(); mouseSettingsTests(); screenTests();
     std::cout << "PASS: input, code vectors, pause/restart, pointer bounds, levels, renderer\n";
 }

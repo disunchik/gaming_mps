@@ -15,6 +15,7 @@ target_compile_options(pong PRIVATE -Wall -Wextra -Werror)
 add_test(NAME pong COMMAND pong)
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_FOUND)
+  add_test(NAME keyboard COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_keyboard.py")
   add_test(NAME clipboard COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_clipboard.py")
 endif()
 

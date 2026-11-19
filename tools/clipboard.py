@@ -4,6 +4,7 @@ import binascii
 import ctypes as C
 import os
 import re
+import time
 
 
 def copy_text(text):
@@ -32,8 +33,10 @@ def copy_text(text):
     memory = None
     opened = False
     try:
-        if not user.OpenClipboard(window):
-            return False
+        deadline = time.monotonic() + 0.25
+        while not user.OpenClipboard(window):
+            if time.monotonic() >= deadline: return False
+            time.sleep(0.01)
         opened = True
         data = text.encode('utf-16-le') + b'\0\0'
         memory = kernel.GlobalAlloc(0x2, len(data))

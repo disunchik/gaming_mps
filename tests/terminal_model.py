@@ -7,12 +7,14 @@ from pathlib import Path
 
 class TerminalModel:
     """Recover actual emulated screen cells from fragmented UART output."""
-    def __init__(self):
-        """Start with the project's 100x40 background and a UTF-8 decoder."""
+    def __init__(self, width=100, height=40, background=234):
+        """Start with configurable viewport geometry and the terminal default background."""
         self.decoder = codecs.getincrementaldecoder('utf-8')('replace')
-        self.cells = [[[' ', 223, 234] for _ in range(100)] for _ in range(40)]
+        self.width, self.height = width, height
+        self.default_bg = background
+        self.cells = [[[' ', 223, background] for _ in range(width)] for _ in range(height)]
         self.x = self.y = 0
-        self.fg, self.bg = 223, 234
+        self.fg, self.bg = 223, background
         self.escape = ''
         self.complete = False
 
@@ -27,10 +29,10 @@ class TerminalModel:
                 elif len(self.escape) > 128: self.escape = ''
             elif char == '\x1b': self.escape = char
             elif char == '\r': self.x = 0
-            elif char == '\n': self.y = min(39, self.y + 1)
+            elif char == '\n': self.y = min(self.height - 1, self.y + 1)
             elif ord(char) >= 32:
-                if self.x < 100: self.cells[self.y][self.x] = [char, self.fg, self.bg]
-                self.x = min(100, self.x + 1)
+                if self.x < self.width: self.cells[self.y][self.x] = [char, self.fg, self.bg]
+                self.x = min(self.width, self.x + 1)
 
     def csi(self, parameters, command):
         """Implement cursor placement, clear and indexed foreground/background."""
@@ -38,10 +40,10 @@ class TerminalModel:
         args = [int(value or '0') for value in parameters.split(';')]
         if command in ('H', 'f'):
             self.complete = False
-            self.y = max(0, min(39, (args[0] or 1) - 1))
-            self.x = max(0, min(99, (args[1] if len(args) > 1 and args[1] else 1) - 1))
+            self.y = max(0, min(self.height - 1, (args[0] or 1) - 1))
+            self.x = max(0, min(self.width - 1, (args[1] if len(args) > 1 and args[1] else 1) - 1))
         elif command == 'J' and args == [2]:
-            self.cells = [[[' ', self.fg, self.bg] for _ in range(100)] for _ in range(40)]
+            self.cells = [[[' ', self.fg, self.bg] for _ in range(self.width)] for _ in range(self.height)]
         elif command == 'm':
             i = 0
             while i < len(args):
@@ -51,7 +53,7 @@ class TerminalModel:
                     i += 3
                 else:
                     if args[i] == 0:
-                        self.fg, self.bg = 223, 234
+                        self.fg, self.bg = 223, self.default_bg
                         self.complete = True
                     i += 1
 
@@ -75,7 +77,7 @@ class TerminalModel:
                 levels = [0, 95, 135, 175, 215, 255]
                 return '#%02x%02x%02x' % (levels[index // 36], levels[(index // 6) % 6], levels[index % 6])
             return '#ffffff'
-        svg = ['<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="880" viewBox="0 0 1200 880">',
+        svg = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{self.width * 12}" height="{self.height * 22}" viewBox="0 0 {self.width * 12} {self.height * 22}">',
                '<title>Кадр прошивки QEMU, восстановленный из UART</title>']
         for y, row in enumerate(self.cells):
             for x, (char, fg, bg) in enumerate(row):

@@ -15,6 +15,23 @@ int main() {
     CHECK(m.state == State::Playing && m.playerScore == 0 && m.serveMs == 700);
     m.point(0); m.update(1000); CHECK(m.player >= m.half && m.player < m.arena / 2);
     m.point(71); m.update(2000); CHECK(m.player <= m.arena - m.half);
+    m.start(settings);
+    const int center = m.player;
+    m.move(1); CHECK(m.target - center == 2 * m.unit);
+    m.update(50); CHECK(m.player - center == 13500); // 54 columns/s, without teleporting.
+    m.start(settings); m.hold(1); m.move(1);
+    m.update(120); CHECK(m.player - center == 32400); // No OS repeat after the first press.
+    m.update(120); CHECK(m.player - center == 64800);
+    m.hold(0); const int released = m.player;
+    m.update(100); CHECK(m.player == released);
+    m.hold(-1); m.update(100); CHECK(m.player == released - 27000);
+    m.point(71); m.update(100); CHECK(m.player == released); // Mouse takes over.
+    m.hold(0); m.update(100); CHECK(m.player == released + 27000); // Key-up preserves mouse target.
+    m.start(settings); m.update(100); CHECK(m.player == center); // Restart clears held state.
+    m.start(settings); m.point(71);
+    m.bots[0] = m.half;
+    m.update(100); CHECK(m.player == m.arena / 2 + 27000 && m.bots[0] == m.half + 18000);
+    m.point(0); m.update(100); CHECK(m.player == m.arena / 2); // Immediate direction reversal.
     m.start(settings); m.serveMs = 0;
     m.ball = {100, 15 * m.unit, -120000, 120000};
     m.update(10); CHECK(m.ball.x >= 0 && m.ball.vx > 0);

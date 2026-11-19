@@ -3,9 +3,9 @@
 #include <algorithm>
 #include <cstdlib>
 
-/** @brief Приближает позицию к цели с одинаковым пределом скорости ракеток. */
-static int approach(int position, int target) {
-    constexpr int distance = 18 * PongModel::unit / 100;
+/** @brief Приближает позицию к цели с заданным пределом скорости. */
+static int approach(int position, int target, int speed) {
+    const int distance = speed * PongModel::unit / 100;
     return position + std::clamp(target - position, -distance, distance);
 }
 void PongModel::start(const Settings& value) {
@@ -14,6 +14,7 @@ void PongModel::start(const Settings& value) {
     playerScore = botScore = hits = 0;
     timeMs = rallyMs = pending_ = 0;
     player = target = arena / 2;
+    held_ = 0;
     bots = botCount() == 2 ? std::array<int, 2>{{arena / 4, 3 * arena / 4}} : std::array<int, 2>{{arena / 2, arena / 2}};
     flashMs = 0; lastPointHuman = false;
     random_ = settings.seed ? settings.seed : 0x6d2b79f5u;
@@ -83,12 +84,18 @@ void PongModel::goal(bool human) {
     serve(human ? -1 : 1);
 }
 void PongModel::point(int column) {
-    if (state == State::Playing && column >= 0 && column < 72)
+    if (state == State::Playing && column >= 0 && column < 72) {
+        held_ = 0;
         target = std::clamp(column * unit / 2 + unit / 4, half, arena - half);
+    }
 }
 void PongModel::move(int direction) {
-    if (state == State::Playing)
-        target = std::clamp(target + direction * unit, half, arena - half);
+    if (state == State::Playing && !held_)
+        target = std::clamp(target + direction * 2 * unit, half, arena - half);
+}
+void PongModel::hold(int direction) {
+    if (!direction && held_) target = player;
+    held_ = std::clamp(direction, -1, 1);
 }
 void PongModel::update(std::uint32_t ms) {
     if (state != State::Playing) return;
@@ -101,7 +108,8 @@ void PongModel::update(std::uint32_t ms) {
 void PongModel::step() {
     timeMs += 10;
     if (flashMs) flashMs -= 10;
-    player = approach(player, target);
+    if (held_) target = held_ < 0 ? half : arena - half;
+    player = approach(player, target, 27);
     for (unsigned i = 0; i < botCount(); ++i) {
         int destination = botCount() == 2 ? (2 * i + 1) * arena / 4 : arena / 2;
         if (ball.vy < 0 && !serveMs) {
@@ -109,7 +117,7 @@ void PongModel::step() {
         }
         const int low = botCount() == 2 ? i * arena / 2 + half : half;
         const int high = botCount() == 2 ? (i + 1) * arena / 2 - half : arena - half;
-        bots[i] = approach(bots[i], std::clamp(destination, low, high));
+        bots[i] = approach(bots[i], std::clamp(destination, low, high), 18);
     }
     if (serveMs) { serveMs -= 10; return; }
     const int before = multiplier();

@@ -53,6 +53,8 @@ public:
               char32_t glyph = U' ');
     /** @brief Выводит строку внутри боковой панели, начиная с колонки 0. */
     void panelText(int row, std::string_view value, Color foreground = Theme::text);
+    /** @brief Выводит текст с локальным x внутри панели; обрезает по её границам. */
+    void panelTextAt(int x, int row, std::string_view value, Color foreground = Theme::text);
     /** @brief Выводит подпись и число внутри боковой панели. */
     void panelNumber(int row, std::string_view label, std::int64_t value,
                      Color foreground = Theme::text);

@@ -1,5 +1,4 @@
 """Run the real Tetris firmware through the shared QEMU UART launcher."""
-import argparse
 from pathlib import Path
 import re
 import socket
@@ -13,9 +12,8 @@ from terminal import mouse_bytes
 from tests.terminal_model import TerminalModel
 
 SCREENS = ROOT / "artifacts" / "screens"
-CODE = re.compile(r"(?:P1-[0-9A-Z]{6}(?:-[0-9A-Z]{6}){3}|P2-(?:[0-9A-Z]{4}-){2}[0-9A-Z]{5})")
-# Equivalent codes for Tetris, Normal, level 1, seed 0.
-DEMO_P1 = "P1-040020-800000-000003-ZZYV67"
+CODE = re.compile(r"P2-(?:[0-9A-Z]{4}-){2}[0-9A-Z]{5}")
+# Tetris, Normal, level 1, seed 0.
 DEMO_P2 = "P2-0G00-0000-02RGG"
 
 # Screen::fieldX, fieldY, width and height from the shared screen contract.
@@ -91,7 +89,9 @@ class Session:
         self.text("Меняет начальный темп")
         if adjustment:
             self.key(adjustment)
-        self.text(f"< {difficulty} >")
+        self.wait(lambda: any("Сложность:" in row and difficulty in row
+                              for row in self.screen.text().splitlines()),
+                  f"difficulty {difficulty}")
         self.click_option("Начать игру")
         self.wait(lambda: len(self.falling()) == 4 and "Счёт: 0" in self.screen.text(),
                   "a fresh Tetris board")
@@ -138,17 +138,12 @@ def play_demo(session, input_code, emitted_code):
 
 def main():
     """Exercise all difficulties, movement, pause, replay and game over."""
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--expect-p2", action="store_true", help="Require the shared firmware to emit P2 codes")
-    args = parser.parse_args()
     with Qemu(port=5557) as qemu:
         session = Session(qemu.serial)
         session.text("Выбери игру")
         session.start(b"a", "Лёгкая")
         original_code = session.code()
-        emits_p2 = original_code.startswith("P2-")
-        if args.expect_p2:
-            assert emits_p2, f"Expected a new P2 code, received {original_code}"
+        assert original_code.startswith("P2-")
         initial = session.falling()
         session.key(b"\x1b[D")
         left = min(x for x, _ in initial)
@@ -189,10 +184,8 @@ def main():
         assert session.code() == hard_code
         session.key(b"q")
         session.text("Выбери игру")
-        play_demo(session, DEMO_P1, DEMO_P2 if emits_p2 else DEMO_P1)
-        if emits_p2:
-            play_demo(session, DEMO_P2, DEMO_P2)
-            print("PASS: P1 and P2 start the same game and replay as P2")
+        play_demo(session, DEMO_P2, DEMO_P2)
+        print("PASS: P2 challenge and deterministic replay")
     print("PASS: ESP32 UART and menu, all difficulties, pause, replay, loss, bounty, gold and level 2")
 
 

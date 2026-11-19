@@ -102,14 +102,22 @@ void Screen::frame(int x, int y, int w, int h, Color foreground) {
         }
 }
 void Screen::panelText(int row, std::string_view value, Color foreground) {
-    clippedText(panelX, row + fieldY, value, foreground, Theme::background, panelX, fieldY, panelWidth, panelHeight);
+    panelTextAt(0, row, value, foreground);
+}
+void Screen::panelTextAt(int x, int row, std::string_view value, Color foreground) {
+    clippedText(panelX + x, row + fieldY, value, foreground, Theme::background, panelX, fieldY, panelWidth, panelHeight);
 }
 void Screen::panelNumber(int row, std::string_view label, std::int64_t value, Color foreground) {
     panelText(row, std::string(label) + " " + std::to_string(value), foreground);
 }
 void Screen::flush() {
     std::string output;
-    if (!initialized_) output = "\x1b[?1049h\x1b[?25l\x1b[?1003h\x1b[?1006h\x1b[2J";
+    if (!initialized_) {
+        char setup[96];
+        std::snprintf(setup, sizeof(setup), "\x1b[?1049h\x1b[?25l\x1b[?1003h\x1b[?1006h\x1b[48;5;%um\x1b[2J",
+                      static_cast<unsigned>(Theme::background));
+        output = setup; // Clear the full viewport, including space beyond the game canvas.
+    }
     for (int y = 0; y < canvasHeight; ++y) {
         int x = 0;
         while (x < canvasWidth) {
@@ -131,7 +139,9 @@ void Screen::flush() {
     }
     initialized_ = true;
     if (!output.empty()) {
-        output += "\x1b[0m";
+        char reset[32];
+        std::snprintf(reset, sizeof(reset), "\x1b[0m\x1b[48;5;%um", static_cast<unsigned>(Theme::background));
+        output += reset;
         output_(output.data(), output.size(), context_);
     }
 }

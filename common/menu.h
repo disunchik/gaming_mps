@@ -42,6 +42,13 @@ private:
     std::string copyRequest_; ///< Ожидающий отправки код для буфера.
     std::string copyStatus_; ///< Подтверждение или ошибка копирования.
     unsigned copyWait_ = 0; ///< Тайм-аут подтверждения Windows в миллисекундах.
+    static constexpr int settingsDifficultyY_ = 16; ///< Абсолютная строка сложности.
+    static constexpr int settingsLevelY_ = 19; ///< Абсолютная строка уровня/размера.
+    static constexpr int settingsStartY_ = 23; ///< Абсолютная строка запуска.
+    static constexpr int settingsBackY_ = 25; ///< Абсолютная строка возврата.
+    static constexpr unsigned sceneryStepMs_ = 160; ///< Время сдвига перекати-поля на столбец.
+    static constexpr unsigned sceneryPeriodMs_ = 106 * sceneryStepMs_; ///< Полный оборот фона.
+    unsigned sceneryMs_ = 0; ///< Фаза фона; не относится к игровому времени или RNG.
     /** @brief Запрашивает копирование доступного кода, не затрагивая игру. */
     void copy();
     bool skipUpdate_ = true; ///< Исключает время перехода/паузы из следующего update.
@@ -63,6 +70,10 @@ private:
     std::string currentCode() const;
     /** @brief Рисует выбранную или обычную строку меню. */
     void option(Screen& screen, int row, int y, std::string_view text) const;
+    /** @brief Рисует настройку с постоянными зонами уменьшения и увеличения. */
+    void setting(Screen& screen, int row, int y, std::string_view label, std::string_view value) const;
+    /** @brief Рисует маленькое перекати-поле перед непрозрачной рамкой меню. */
+    void scenery(Screen& screen) const;
 };
 
 /** @brief Читаемое имя игры. */

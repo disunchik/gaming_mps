@@ -23,6 +23,9 @@ bool InputReader::finish(Input& event) {
     }
     if (std::strcmp(sequence_, "\x1b[901~") == 0) { event.type = InputType::CopySucceeded; return true; }
     if (std::strcmp(sequence_, "\x1b[902~") == 0) { event.type = InputType::CopyFailed; return true; }
+    if (std::strcmp(sequence_, "\x1b[910~") == 0) { event.type = InputType::HeldLeft; return true; }
+    if (std::strcmp(sequence_, "\x1b[911~") == 0) { event.type = InputType::HeldRight; return true; }
+    if (std::strcmp(sequence_, "\x1b[912~") == 0) { event.type = InputType::HorizontalReleased; return true; }
     switch (final) {
         case 'A': event.type = InputType::Up; break;
         case 'B': event.type = InputType::Down; break;

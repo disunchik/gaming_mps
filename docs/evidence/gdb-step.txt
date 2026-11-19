@@ -1,5 +1,5 @@
 0x40000400 in ?? ()
-Hardware assisted breakpoint 1 at 0x400d415c: file D:/Projects/gaming_mps/main/main.cpp, line 21.
+Hardware assisted breakpoint 1 at 0x400d4188: file D:/Projects/gaming_mps/main/main.cpp, line 21.
 
 Thread 1 hit Temporary breakpoint 1, app_main () at D:/Projects/gaming_mps/main/main.cpp:21
 21	extern "C" void app_main() {
@@ -13,11 +13,11 @@ Thread 1 hit Temporary breakpoint 1, app_main () at D:/Projects/gaming_mps/main/
 23	    esp_log_level_set("*", ESP_LOG_NONE);
 24	    static Screen screen(writeUart);
 25	    static Tetris tetris;
-$1 = 0x400d415c
+$1 = 0x400d4188
 22	    ESP_ERROR_CHECK(uart_driver_install(UART_NUM_0, 4096, 0, 0, nullptr, 0));
-$2 = 0x400d415f
+$2 = 0x400d418b
 23	    esp_log_level_set("*", ESP_LOG_NONE);
-$3 = 0x400d4182
+$3 = 0x400d41ae
 #0  app_main () at D:/Projects/gaming_mps/main/main.cpp:23
 23	    esp_log_level_set("*", ESP_LOG_NONE);
 [Inferior 1 (process 1) detached]

@@ -61,10 +61,10 @@ int Menu::hit(int x, int y) const {
             if (y >= 10 && y <= 18 && y % 2 == 0) return (y - 10) / 2;
             break;
         case Page::Settings:
-            if (y == 9) return 0;
-            if (game_ != GameId::Tetris && y == 12) return 1;
-            if (y == 16) return rows() - 2;
-            if (y == 18) return rows() - 1;
+            if (y == settingsDifficultyY_ - 5) return 0;
+            if (game_ != GameId::Tetris && y == settingsLevelY_ - 5) return 1;
+            if (y == settingsStartY_ - 5) return rows() - 2;
+            if (y == settingsBackY_ - 5) return rows() - 1;
             break;
         case Page::Paused:
             if (y >= 13 && y <= 19 && y % 2) return (y - 13) / 2;
@@ -121,6 +121,12 @@ void Menu::activate() {
     }
 }
 void Menu::handle(const Input& input) {
+    if (input.type == InputType::HeldLeft || input.type == InputType::HeldRight ||
+        input.type == InputType::HorizontalReleased) {
+        // Release must reach the game even while paused, without advancing time.
+        if (page_ == Page::Playing || page_ == Page::Paused) game().handle(input);
+        return;
+    }
     if (input.type == InputType::CopySucceeded || input.type == InputType::CopyFailed) {
         if (copyWait_) {
             copyStatus_ = input.type == InputType::CopySucceeded ? "Скопировано" : "Не удалось скопировать";
@@ -188,7 +194,13 @@ void Menu::handle(const Input& input) {
         const int row = hit(input.x, input.y);
         if (row >= 0) {
             selected_ = row;
-            if (input.type == InputType::PointerLeft) activate();
+            if (input.type == InputType::PointerLeft) {
+                if (page_ == Page::Settings && row < rows() - 2) {
+                    Input direction;
+                    direction.type = input.x < 53 ? InputType::Left : InputType::Right;
+                    handle(direction);
+                } else activate();
+            }
         }
         return;
     }
@@ -207,6 +219,9 @@ void Menu::handle(const Input& input) {
     }
 }
 void Menu::update(std::uint32_t ms) {
+    if (page_ == Page::Main || page_ == Page::Settings || page_ == Page::Code ||
+        page_ == Page::CodeConfirm || page_ == Page::Help)
+        sceneryMs_ = (sceneryMs_ + ms % sceneryPeriodMs_) % sceneryPeriodMs_;
     if (copyWait_) {
         if (ms >= copyWait_) { copyWait_ = 0; copyStatus_ = "Буфер недоступен"; }
         else copyWait_ -= ms;
@@ -269,11 +284,37 @@ void Menu::draw(Screen& s) const {
         }
         return;
     }
+    scenery(s);
+    if (page_ == Page::Help) {
+        s.canvasText(1, 2, "Три игры. Один салун.", Theme::muted);
+        s.canvasFill(12, 7, 76, 28, Theme::paper);
+        s.canvasFrame(12, 7, 76, 28, Theme::wood);
+        s.canvasFill(13, 8, 74, 3, Theme::wood);
+        s.canvasText(36, 9, "ПРАВИЛА САЛУНА «ТРИ СТВОЛА»", Theme::white, Theme::wood);
+        const auto ink = [&s](int x, int y, std::string_view value, Color color = Theme::ink) {
+            s.canvasText(x, y, value, color, Theme::paper);
+        };
+        ink(17, 12, "ТЕТРИС / ЗОЛОТАЯ ШАХТА", Theme::wood);
+        ink(19, 14, "A/D или ←/→ — сдвиг. W/↑ — поворот. S/↓ — быстрее.");
+        ink(19, 15, "Собирай ряды: каждые 10 линий открывают новый уровень.");
+        ink(17, 17, "САПЁР / МИННОЕ ПОЛЕ", Theme::wood);
+        ink(19, 19, "ЛКМ / Enter / пробел — открыть. ПКМ / F — флаг.");
+        ink(19, 20, "Стрелки/WASD — курсор. Береги сапоги: под ними мины.");
+        ink(17, 22, "ПИН-ПОНГ / РИКОШЕТ САЛУНА", Theme::wood);
+        ink(19, 24, "Держи A/D или ←/→. Мышью — веди ракетку за пробкой.");
+        ink(19, 25, "Первый до 5 очков забирает матч. После уровня 3 — бонус.");
+        s.canvasFill(16, 28, 68, 3, Theme::wood);
+        s.canvasText(19, 28, "P — пауза / перекур       R — повторить те же условия", Theme::white, Theme::wood);
+        s.canvasText(19, 30, "Q — вернуться в салун     C — скопировать код испытания", Theme::white, Theme::wood);
+        ink(19, 32, "Поделись кодом: друг начнёт с тех же стартовых условий.", Theme::paperMuted);
+        ink(19, 33, "Enter / Esc / ЛКМ — назад", Theme::paperMuted);
+        return;
+    }
     // A paper notice inside a wooden saloon sign; all controls keep their coordinates.
     s.canvasFill(18, 10, 64, 20, Theme::paper);
     s.canvasFrame(18, 10, 64, 20, Theme::wood);
     s.canvasFill(19, 11, 62, 3, Theme::wood);
-    s.canvasText(34, 11, "*  САЛУН «ТРИ СТВОЛА»  *", Theme::white, Theme::wood);
+    s.canvasText(38, 11, "*  САЛУН «ТРИ СТВОЛА»  *", Theme::white, Theme::wood);
     s.canvasText(1, 2, "Три игры. Один салун.", Theme::muted);
     if (page_ != Page::Code)
         s.canvasText(1, 37, "Стрелки/WASD: выбор   Enter/ЛКМ: подтвердить   Esc/Q: назад", Theme::muted);
@@ -291,42 +332,40 @@ void Menu::draw(Screen& s) const {
     if (page_ == Page::Main) {
         title("Выбери игру");
         const char* items[] = {"Тетрис", "Сапёр", "Пин-понг", "Играть по коду", "Управление"};
-        const char* notes[] = {"01 / ПАША", "02 / ТЁМА", "03 / ДМИТРИЙ", "КОД ИСПЫТАНИЯ", "ПРАВИЛА САЛУНА"};
+        const char* notes[] = {"01 / КОВБОЙ ПАША", "02 / КОВБОЙ ТЁМА", "03 / КОВБОЙ ДИМА", "КОД ИСПЫТАНИЯ", "ПРАВИЛА САЛУНА"};
         for (int i = 0; i < 5; ++i) {
             const int y = 10 + 2 * i;
             option(s, i, y, items[i]);
             s.canvasText(60, y + 5, notes[i], selected_ == i ? Theme::white : Theme::paperMuted,
                          selected_ == i ? Theme::wood : Theme::paper);
         }
-        text(21, "* --------------------------------------------- *", Theme::paperMuted);
-        text(22, "Сапёр — в разработке", Theme::paperMuted);
     } else if (page_ == Page::Settings) {
         title(gameName(game_));
-        option(s, 0, 9, std::string("Сложность: < ") + difficultyName(difficulties_[static_cast<unsigned>(game_)]) + " >");
+        setting(s, 0, settingsDifficultyY_ - 5, "Сложность:", difficultyName(difficulties_[static_cast<unsigned>(game_)]));
         const char* hint = game_ == GameId::Tetris ? "Меняет начальный темп падения"
             : game_ == GameId::Pong ? "Меняет только точность компьютера" : "Меняет долю мин: 10 / 15 / 20%";
-        text(10, hint, Theme::paperMuted);
+        text(settingsDifficultyY_ - 4, hint, Theme::paperMuted);
         if (game_ == GameId::Minesweeper) {
             const std::string size = std::to_string(6 + 2 * mineLevel_);
-            option(s, 1, 12, "Размер: < " + size + "x" + size + " >");
-            text(13, "После победы предложим следующий размер", Theme::paperMuted);
+            setting(s, 1, settingsLevelY_ - 5, "Размер:", size + "x" + size);
+            text(settingsLevelY_ - 4, "После победы предложим следующий размер", Theme::paperMuted);
         }
         if (game_ == GameId::Pong) {
-            option(s, 1, 12, "Уровень: < " + std::to_string(pongLevel_) + " >");
-            text(13, "1–3: начальная скорость мяча", Theme::paperMuted);
+            setting(s, 1, settingsLevelY_ - 5, "Уровень:", std::to_string(pongLevel_));
+            text(settingsLevelY_ - 4, "1–3: начальная скорость мяча", Theme::paperMuted);
         }
-        option(s, rows() - 2, 16, "Начать игру");
-        option(s, rows() - 1, 18, "Назад");
+        option(s, rows() - 2, settingsStartY_ - 5, "Начать игру");
+        option(s, rows() - 1, settingsBackY_ - 5, "Назад");
         const char* summary = game_ == GameId::Pong ? "Матч до 5 очков. После уровня 3 — бонус."
             : game_ == GameId::Tetris ? "Убирай ряды. Каждые 10 линий — новый уровень."
-            : "Сейчас запустится проверка ввода, без механики";
-        text(22, summary, Theme::paperMuted);
+            : "Выбери размер поля и сложность.";
+        text(23, summary, Theme::paperMuted);
     } else if (page_ == Page::Code) {
         title("Играть по коду");
         text(10, "Введи код друга — сыграй в тех же условиях");
         text(12, "> " + codeText_.substr(codeText_.size() > 54 ? codeText_.size() - 54 : 0));
         text(15, error_, Theme::paperError);
-        text(19, "Формат: P2-XXXX-XXXX-XXXXX; P1 тоже принимается", Theme::paperMuted);
+        text(19, "Формат: P2-XXXX-XXXX-XXXXX", Theme::paperMuted);
         s.canvasText(1, 37, "Enter: проверить   Backspace: стереть   Esc: назад", Theme::muted);
     } else if (page_ == Page::CodeConfirm) {
         title("Код проверен");
@@ -334,16 +373,26 @@ void Menu::draw(Screen& s) const {
         text(12, "Начальный уровень: " + std::to_string(settings_.level));
         option(s, 0, 16, "Начать игру");
         option(s, 1, 18, "Назад к коду");
-    } else if (page_ == Page::Help) {
-        title("Управление");
-        const char* lines[] = {"Тетрис: влево/вправо — сдвиг, вверх — поворот",
-            "Вниз — ускорить; мгновенного сброса нет", "Сапёр: ЛКМ / Enter / пробел — открыть",
-            "ПКМ / F — флаг; стрелки — курсор", "Пин-понг: влево/вправо или мышь — ракетка",
-            "WASD дублируют стрелки", "P — пауза, R — те же условия, Q — в меню",
-            "На паузе игра и её время остановлены", "Код испытания повторяет стартовые условия"};
-        for (int i = 0; i < 9; ++i) text(10 + i, lines[i]);
-        text(22, "Enter / Esc / ЛКМ — назад", Theme::paperMuted);
     }
+}
+
+void Menu::setting(Screen& s, int row, int y, std::string_view label, std::string_view value) const {
+    option(s, row, y, label);
+    const Color bg = selected_ == row ? Theme::wood : Theme::paper;
+    const Color fg = selected_ == row ? Theme::white : Theme::ink;
+    s.canvasText(42, y + 5, "<", fg, bg);
+    s.canvasText(48, y + 5, value, fg, bg);
+    s.canvasText(64, y + 5, ">", fg, bg);
+}
+
+void Menu::scenery(Screen& s) const {
+    const unsigned step = sceneryMs_ / sceneryStepMs_;
+    const int x = static_cast<int>((step + 6) % 106) - 3;
+    static constexpr const char* frames[4][2] = {
+        {"\\|/", "/|\\"}, {"-*-", "\\|/"}, {"/|\\", "\\|/"}, {"\\|/", "-*-"}
+    };
+    s.canvasText(x, 27, frames[step % 4][0], Theme::muted);
+    s.canvasText(x, 28, frames[step % 4][1], Theme::muted);
 }
 
 void Menu::copy() {

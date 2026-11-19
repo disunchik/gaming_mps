@@ -1,7 +1,7 @@
 Executing action: all (aliases: build)
 Running ninja in directory D:\Projects\gaming_mps\build
 Executing "ninja all"...
-[1/13] Performing build step for 'bootloader'
+[1/9] Performing build step for 'bootloader'
 
 [1/1] C:\Windows\system32\cmd.exe /C "cd /D D:\Projects\gaming_mps\build\bootloader\esp-idf\esptool_py && D:\Espressif\python_env\idf5.5_py3.12_env\Scripts\python.exe D:/esp/.espressif/v5.5.1/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 bootloader 0x1000 D:/Projects/gaming_mps/build/bootloader/bootloader.bin"
 
@@ -10,27 +10,19 @@ Bootloader binary size 0x6680 bytes. 0x980 bytes (8%) free.
 
 
 
-[2/13] No install step for 'bootloader'
+[2/9] No install step for 'bootloader'
 
-[3/13] Completed 'bootloader'
+[3/9] Completed 'bootloader'
 
-[4/13] Building CXX object esp-idf/common/CMakeFiles/__idf_common.dir/stub.cpp.obj
+[4/9] Building CXX object esp-idf/common/CMakeFiles/__idf_common.dir/menu.cpp.obj
 
-[5/13] Building CXX object esp-idf/common/CMakeFiles/__idf_common.dir/screen.cpp.obj
+[5/9] Linking C static library esp-idf\common\libcommon.a
 
-[6/13] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/main.cpp.obj
+[6/9] Generating esp-idf/esp_system/ld/sections.ld
 
-[7/13] Building CXX object esp-idf/common/CMakeFiles/__idf_common.dir/menu.cpp.obj
+[7/9] Linking CXX executable gaming_mps.elf
 
-[8/13] Linking C static library esp-idf\common\libcommon.a
-
-[9/13] Linking C static library esp-idf\main\libmain.a
-
-[10/13] Generating esp-idf/esp_system/ld/sections.ld
-
-[11/13] Linking CXX executable gaming_mps.elf
-
-[12/13] Generating binary image from built executable
+[8/9] Generating binary image from built executable
 
 esptool.py v4.13.0
 
@@ -46,9 +38,9 @@ Successfully created esp32 image.
 
 Generated D:/Projects/gaming_mps/build/gaming_mps.bin
 
-[13/13] C:\Windows\system32\cmd.exe /C "cd /D D:\Projects\gaming_mps\build\esp-idf\esptool_py && D:\Espressif\python_env\idf5.5_py3.12_env\Scripts\python.exe D:/esp/.espressif/v5.5.1/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 partition --type app D:/Projects/gaming_mps/build/partition_table/partition-table.bin D:/Projects/gaming_mps/build/gaming_mps.bin"
+[9/9] C:\Windows\system32\cmd.exe /C "cd /D D:\Projects\gaming_mps\build\esp-idf\esptool_py && D:\Espressif\python_env\idf5.5_py3.12_env\Scripts\python.exe D:/esp/.espressif/v5.5.1/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 partition --type app D:/Projects/gaming_mps/build/partition_table/partition-table.bin D:/Projects/gaming_mps/build/gaming_mps.bin"
 
-gaming_mps.bin binary size 0x39640 bytes. Smallest app partition is 0x100000 bytes. 0xc69c0 bytes (78%) free.
+gaming_mps.bin binary size 0x3ad00 bytes. Smallest app partition is 0x100000 bytes. 0xc5300 bytes (77%) free.
 
 
 

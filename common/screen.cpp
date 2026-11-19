@@ -143,3 +143,19 @@ std::string Screen::plain() const {
     }
     return result;
 }
+
+void Screen::copyText(std::string_view text) {
+    static constexpr char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    if (text.empty() || text.size() > 64) return;
+    std::string sequence = "\x1b]52;c;";
+    for (std::size_t i = 0; i < text.size(); i += 3) {
+        unsigned block = static_cast<unsigned char>(text[i]) << 16;
+        if (i + 1 < text.size()) block |= static_cast<unsigned char>(text[i + 1]) << 8;
+        if (i + 2 < text.size()) block |= static_cast<unsigned char>(text[i + 2]);
+        sequence += alphabet[(block >> 18) & 63]; sequence += alphabet[(block >> 12) & 63];
+        sequence += i + 1 < text.size() ? alphabet[(block >> 6) & 63] : '=';
+        sequence += i + 2 < text.size() ? alphabet[block & 63] : '=';
+    }
+    sequence += '\a';
+    output_(sequence.data(), sequence.size(), context_);
+}

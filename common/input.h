@@ -7,7 +7,8 @@
 enum class InputType : std::uint8_t {
     None, Up, Down, Left, Right, Confirm, Open, Flag,
     PointerMove, PointerLeft, PointerRight,
-    Pause, Restart, Back, Text, Erase
+    Pause, Restart, Back, Text, Erase,
+    Copy, CopySucceeded, CopyFailed
 };
 
 /** @brief Одно событие; команды оболочки перехватываются до Game::handle. */

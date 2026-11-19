@@ -17,26 +17,18 @@ def worker(report):
     """Own a console and verify keyboard, left/right click and motion end to end."""
     from terminal import Terminal, InputRecord, BufferInfo, C, W, kernel
     from run import Qemu
-    from tests.terminal_model import TerminalModel
+    from uart_session import Session, player_left
+    from clipboard_support import verified_copy
     import socket
     assert C.sizeof(InputRecord) == 20
-    model = TerminalModel()
     with Terminal() as terminal, Qemu(port=5557) as qemu:
-        def wait(text):
-            """Render real UART bytes and wait for a completed expected frame."""
-            deadline = time.monotonic() + 12
-            while time.monotonic() < deadline:
-                try:
-                    data = qemu.serial.recv(8192)
-                    model.feed(data)
-                    terminal.write(data)
-                except socket.timeout: pass
-                if model.complete and text in model.text():
-                    actual = console_rows(terminal)
-                    expected = model.text().splitlines()
-                    assert actual == expected, '\n'.join(f'{i}: {a!r} != {b!r}' for i, (a, b) in enumerate(zip(actual, expected)) if a != b)
-                    return
-            raise AssertionError(f'Native console expected: {text}\n{model.text()}')
+        session = Session(qemu, terminal.write, verified_copy)
+        model = session.model
+        def wait(text, condition=lambda _: True):
+            session.wait(text, condition=condition)
+            actual = console_rows(terminal)
+            expected = model.text().splitlines()
+            assert actual == expected, '\n'.join(f'{i}: {a!r} != {b!r}' for i, (a, b) in enumerate(zip(actual, expected)) if a != b)
 
         def inject(record):
             """Write one native input record to this test's own console queue."""
@@ -71,28 +63,27 @@ def worker(report):
             return inject(record)
 
         wait('Выбери игру')
-        (ROOT / 'artifacts/screens/native-main.txt').write_text('\n'.join(console_rows(terminal)), encoding='utf-8')
+        session.snapshot('native-main')
         assert key(40) == b'\x1b[B'
-        mouse(30, 17, 1)
-        mouse(30, 17, 0)
-        wait('Меняет долю мин')
-        mouse(30, 21, 1)
-        mouse(30, 21, 0)
-        wait('Модуль: заглушка')
+        mouse(30, 19, 1); mouse(30, 19, 0)
+        wait('Меняет только точность')
+        mouse(30, 21, 1); mouse(30, 21, 0)
+        wait('Матч до 5 очков')
+        before = player_left(model)
+        assert mouse(6, 20, 0, 1).startswith(b'\x1b[<35;')
+        wait('Матч до 5 очков', condition=lambda m: 0 <= player_left(m) < before)
         assert mouse(20, 11, 2).startswith(b'\x1b[<2;')
         mouse(20, 11, 0)
-        wait('ПКМ')
-        assert mouse(21, 12, 0, 1).startswith(b'\x1b[<35;')
-        wait('Наведение')
         assert key(80, 'p') == b'p'
         wait('Пауза')
-        key(80, 'p')
-        wait('Проверка клеток')
-        model.snapshot(ROOT / 'artifacts/screens', 'native-windows')
-        key(81, 'q')
-        wait('Выбери игру')
+        assert key(67, 'c') == b'c'
+        wait('Скопировано')
+        wait('Пауза')
+        key(80, 'p'); wait('Матч до 5 очков')
+        session.snapshot('native-windows')
+        key(81, 'q'); wait('Выбери игру')
     Path(report).write_text(json.dumps({'passed': True,
-        'checks': ['ReadConsoleInputW', 'WriteConsoleInputW', 'WriteConsoleW', 'ReadConsoleOutputCharacterW: all 100x40 cells match firmware', 'arrow', 'left click', 'right click', 'hover', 'pause', 'return', 'QEMU UART']}, indent=2), encoding='utf-8')
+        'checks': ['ReadConsoleInputW', 'WriteConsoleInputW', 'WriteConsoleW', 'ReadConsoleOutputCharacterW: all 100x40 cells match firmware', 'arrow', 'left click', 'right click', 'hover', 'pause', 'return', 'QEMU UART', 'real clipboard copy and read-back; original formats restored']}, indent=2), encoding='utf-8')
 
 
 def main():
@@ -118,7 +109,7 @@ def main():
         raise
     content = json.loads(report.read_text(encoding='utf-8')) if report.exists() else {}
     assert result == 0 and content.get('passed'), content
-    print('PASS: native Windows console keyboard, left/right click and hover -> ESP32/QEMU')
+    print('PASS: native Windows console 100x40, mouse/keyboard -> Pong and real clipboard read-back')
 
 
 if __name__ == '__main__':

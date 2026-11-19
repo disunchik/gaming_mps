@@ -2,6 +2,7 @@
 #include "input.h"
 #include <cstdio>
 #include <cctype>
+#include <cstring>
 
 bool InputReader::finish(Input& event) {
     event = {};
@@ -20,6 +21,8 @@ bool InputReader::finish(Input& event) {
         else if ((button & 3) == 2) event.type = InputType::PointerRight;
         return event.type != InputType::None;
     }
+    if (std::strcmp(sequence_, "\x1b[901~") == 0) { event.type = InputType::CopySucceeded; return true; }
+    if (std::strcmp(sequence_, "\x1b[902~") == 0) { event.type = InputType::CopyFailed; return true; }
     switch (final) {
         case 'A': event.type = InputType::Up; break;
         case 'B': event.type = InputType::Down; break;
@@ -68,6 +71,7 @@ bool InputReader::feed(std::uint8_t byte, std::uint32_t now, bool textMode, Inpu
             case 's': event.type = InputType::Down; break;
             case 'a': event.type = InputType::Left; break;
             case 'd': event.type = InputType::Right; break;
+            case 'c': event.type = InputType::Copy; break;
             case 'p': event.type = InputType::Pause; break;
             case 'r': event.type = InputType::Restart; break;
             case 'q': event.type = InputType::Back; break;

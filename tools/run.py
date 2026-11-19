@@ -9,6 +9,7 @@ import sys
 import threading
 import time
 from terminal import Terminal
+from clipboard import ClipboardBridge
 
 ROOT = Path(__file__).resolve().parent.parent  # Project root, independent of cwd.
 
@@ -105,6 +106,8 @@ def main():
     if args.debug: print('Ожидание GDB: во втором терминале idf.py gdb')
     try:
         with Terminal() as terminal, Qemu(args.debug) as qemu:
+            bridge = ClipboardBridge()
+            send_lock = threading.Lock()
             alive = threading.Event()
             alive.set()
             def receive():
@@ -113,7 +116,10 @@ def main():
                     try:
                         data = qemu.serial.recv(8192)
                         if not data: break
-                        terminal.write(data)
+                        output, reply = bridge.feed(data)
+                        terminal.write(output)
+                        if reply:
+                            with send_lock: qemu.serial.sendall(reply)
                     except socket.timeout: continue
                     except OSError: break
                 alive.clear()
@@ -123,7 +129,8 @@ def main():
                 while alive.is_set():
                     data = terminal.read()
                     if b'\x1d' in data or b'\x03' in data: break
-                    if data: qemu.serial.sendall(data)
+                    if data:
+                        with send_lock: qemu.serial.sendall(data)
             finally:
                 alive.clear()
                 thread.join(timeout=1)

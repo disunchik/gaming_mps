@@ -60,6 +60,10 @@ static void inputTests() {
     CHECK(!feed("\x1b[<0;99999;6M")); CHECK(!feed("\x1b[<64;4;4M"));
     CHECK(feed("\x1b[<35;4;4M")); CHECK(event.type == InputType::PointerMove);
     CHECK(!feed("\x1b[<" + std::string(90, '1') + ";2;2M"));
+    CHECK(feed("c")); CHECK(event.type == InputType::Copy);
+    CHECK(feed("c", true)); CHECK(event.type == InputType::Text);
+    CHECK(feed("\x1b[901~")); CHECK(event.type == InputType::CopySucceeded);
+    CHECK(feed("\x1b[902~")); CHECK(event.type == InputType::CopyFailed);
     CHECK(feed("r")); CHECK(event.type == InputType::Restart);
     CHECK(feed("q", true)); CHECK(event.type == InputType::Text && event.character == U'q');
     CHECK(feed("\r")); CHECK(!feed("\n"));
@@ -72,7 +76,7 @@ static void inputTests() {
 /** @brief Сверяет внешний контрольный вектор, повреждения и все допустимые размеры. */
 static void codeTests() {
     Settings settings; settings.level = 3; settings.seed = 0x12345678;
-    CHECK(encodeCode(GameId::Pong, settings) == "P1-041020-R00007-GNHM2B-ZZYZJ4");
+    CHECK(encodeCode(GameId::Pong, settings) == "P2-4SW5-CD0J-0228E");
     GameId game = GameId::Tetris;
     Settings decoded;
     std::string error;
@@ -84,7 +88,7 @@ static void codeTests() {
     CHECK(!decodeCode("P2-041020-R00007-GNHM2B-ZZYZJ4", game, decoded, error));
     for (unsigned id = 0; id < 3; ++id)
         for (unsigned difficulty = 0; difficulty < 3; ++difficulty)
-            for (unsigned level = 1; level <= (id == 1 ? 5u : id == 2 ? 3u : 1u); ++level) {
+            for (unsigned level = 1; level <= (id == 1 ? 5u : id == 2 ? 4u : 1u); ++level) {
                 Settings value; value.difficulty = static_cast<Difficulty>(difficulty); value.level = level;
                 value.seed = level == 1 ? 0 : 0xffffffff;
                 if (id == 1) value.firstX = value.firstY = 5 + 2 * level;
@@ -95,6 +99,20 @@ static void codeTests() {
     Settings invalid; CHECK(encodeCode(GameId::Minesweeper, invalid).empty());
     invalid.firstX = 8; invalid.firstY = 0; CHECK(!validSettings(GameId::Minesweeper, invalid));
     invalid.firstX = 7; CHECK(validSettings(GameId::Minesweeper, invalid));
+    for (unsigned gameId = 0; gameId < 3; ++gameId) {
+        Settings edge; edge.seed = 0xffffffff;
+        if (gameId == 1) { edge.level = 5; edge.firstX = 15; edge.firstY = 15; }
+        else if (gameId == 2) edge.level = 4;
+        const auto encoded = encodeCode(static_cast<GameId>(gameId), edge);
+        CHECK(encoded.size() == 18);
+        CHECK(decodeCode(encoded, game, decoded, error));
+        CHECK(decoded.seed == edge.seed && decoded.level == edge.level && decoded.firstX == edge.firstX);
+        const auto previous = decoded;
+        std::string broken = encoded; broken[3] = broken[3] == 'A' ? 'B' : 'A';
+        CHECK(!decodeCode(broken, game, decoded, error) && decoded.seed == previous.seed);
+        broken = encoded; broken.back() = 'Z';
+        CHECK(!decodeCode(broken, game, decoded, error));
+    }
     invalid.level = 0; CHECK(!validSettings(GameId::Minesweeper, invalid));
 }
 
@@ -155,7 +173,15 @@ static void menuTests() {
     press(menu, InputType::Confirm);
     CHECK(pong.settings.level == 3 && pong.settings.seed == 0x12345678);
     menu.update(0); pong.current.state = State::Won; menu.update(1);
-    CHECK(view(menu).find("Следующий уровень") == std::string::npos);
+    CHECK(view(menu).find("Экстремальный уровень") != std::string::npos);
+    press(menu, InputType::Confirm); CHECK(pong.settings.level == 4);
+    menu.update(0); pong.current.state = State::Won; menu.update(1);
+    CHECK(view(menu).find("Экстремальный уровень") == std::string::npos);
+    const auto handledBeforeCopy = pong.handled;
+    press(menu, InputType::Copy);
+    CHECK(menu.takeCopyRequest().substr(0, 3) == "P2-");
+    CHECK(menu.takeCopyRequest().empty() && pong.handled == handledBeforeCopy);
+    press(menu, InputType::CopySucceeded); CHECK(view(menu).find("Скопировано") != std::string::npos);
 }
 
 /** @brief Проверяет отсечение вывода, отсутствие лишних кадров и чистоту draw. */

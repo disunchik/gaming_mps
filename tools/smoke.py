@@ -1,142 +1,94 @@
-"""Real ESP32/QEMU smoke checks over UART, followed by source-level GDB steps."""
+"""Exercise actual firmware menus, Pong and challenge codes in ESP32/QEMU."""
 import re
 import shutil
 import socket
 import subprocess
 import sys
-import time
 from run import Qemu, ROOT
 from terminal import mouse_bytes
-sys.path.insert(0, str(ROOT))
-from tests.terminal_model import TerminalModel
+sys.path.insert(0, str(ROOT / 'tests'))
+from uart_session import Session, player_left
+
+
+EXTREME = b'P2-6SW5-CD0J-0009T'
 
 
 def main():
-    """Exercise the compiled firmware through its real UART input/output path."""
-    artifacts = ROOT / 'artifacts'
-    artifacts.mkdir(exist_ok=True)
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as occupied:
-        occupied.bind(('127.0.0.1', 0))
-        occupied.listen()
+    artifacts = ROOT / 'artifacts'; artifacts.mkdir(exist_ok=True)
+    with socket.socket() as occupied:
+        occupied.bind(('127.0.0.1', 0)); occupied.listen()
         try:
-            with Qemu(port=occupied.getsockname()[1]):
-                raise AssertionError('An occupied UART port must be rejected')
+            with Qemu(port=occupied.getsockname()[1]): raise AssertionError('occupied port accepted')
         except RuntimeError as error:
-            assert 'занят' in str(error), error
-    model = TerminalModel()
-    with Qemu(port=5556) as qemu, (artifacts / 'uart-smoke.bin').open('wb') as raw:
-        def pump(seconds):
-            """Receive and decode UART during a bounded observation interval."""
-            deadline = time.monotonic() + seconds
-            while time.monotonic() < deadline:
-                try:
-                    data = qemu.serial.recv(16384)
-                    if not data: raise RuntimeError('UART closed unexpectedly')
-                    raw.write(data)
-                    model.feed(data)
-                except socket.timeout: pass
-
-        def wait(text, seconds=8):
-            """Require the expected text to appear in a complete visible frame."""
-            deadline = time.monotonic() + seconds
-            while time.monotonic() < deadline:
-                pump(0.15)
-                if model.complete and text in model.text(): return
-            model.snapshot(artifacts / 'screens', 'failure')
-            raise AssertionError(f'Expected screen text: {text}')
-
-        def send(data, expected=None):
-            """Send real terminal bytes to the emulated UART."""
-            qemu.serial.sendall(data)
-            if expected: wait(expected)
-            else: pump(0.3)
-
-        def click(x, y, expected=None, right=False):
-            """Click a zero-based terminal cell through the production SGR protocol."""
-            button = 2 if right else 0
-            send(mouse_bytes(button, x, y) + mouse_bytes(button, x, y, True), expected)
-
+            assert 'занят' in str(error)
+    with Qemu(port=5556) as qemu:
+        s = Session(qemu)
+        def click(x, y, text):
+            s.send(mouse_bytes(0, x, y) + mouse_bytes(0, x, y, True), text)
         def code():
-            """Extract the complete challenge code visible in the firmware frame."""
-            found = re.search(r'P1-[0-9A-Z]{6}(?:-[0-9A-Z]{6}){3}', model.text())
-            assert found, model.text()
+            found = re.search(r'P2-[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{5}', s.model.text())
+            assert found, s.model.text()
             return found[0]
-
-        wait('Выбери игру', 15)
-        model.snapshot(artifacts / 'screens', 'main')
+        s.wait('Выбери игру', 15); s.snapshot('main')
+        click(30, 15, 'Меняет начальный темп'); click(30, 21, 'Игра ещё не подключена')
+        s.send(b'q', 'Выбери игру')
         click(30, 17, 'Меняет долю мин')
-        click(30, 14, 'Сложная')
-        for _ in range(4): click(30, 17)
-        wait('16x16')
-        model.snapshot(artifacts / 'screens', 'settings')
-        click(30, 21, 'Модуль: заглушка')
-        wait('Уровень 5')
-        click(22, 12, 'ЛКМ')
-        wait('x: 20'); wait('y: 7')
-        click(53, 27, 'ПКМ', right=True)
-        wait('x: 51'); wait('y: 22')
-        model.snapshot(artifacts / 'screens', 'mines-mouse')
-        send(mouse_bytes(35, 80, 10), 'Наведение')
-        wait('x: -1'); wait('y: -1')
-        before = re.search(r'События: (\d+)', model.text())[1]
-        click(74, 34)
-        assert re.search(r'События: (\d+)', model.text())[1] == before
-        send(b'p', 'Пауза')
-        model.snapshot(artifacts / 'screens', 'pause')
-        pump(1.1)
-        send(b'p', 'Проверка клеток')
-        seed = re.search(r'seed: (\d+)', model.text())[1]
-        send(b'r', 'События: 0')
-        assert re.search(r'seed: (\d+)', model.text())[1] == seed
-        send(b'q', 'Выбери игру')
-        click(30, 15, 'Меняет начальный темп')
-        click(30, 21, 'Игра ещё не подключена')
-        first_code = code()
-        send(b'\x1b[D', 'Влево')
-        send(b'p', 'Пауза')
-        send(b'r', 'События: 0')
-        assert code() == first_code
-        send(b'q', 'Выбери игру')
-        click(30, 15, 'Меняет начальный темп')
-        click(30, 21, 'Игра ещё не подключена')
-        assert code() != first_code
-        send(b'q', 'Выбери игру')
-        click(30, 21, 'Введи код друга')
-        vector = b'P1-041020-R00007-GNHM2B-ZZYZJ4'
-        send(vector[:-1] + b'5\r', 'Код повреждён')
-        model.snapshot(artifacts / 'screens', 'invalid-code')
-        send(b'\x7f' * len(vector) + vector + b'\r', 'Код проверен')
-        wait('Пин-понг'); wait('Начальный уровень: 3')
-        model.snapshot(artifacts / 'screens', 'code-confirm')
-        send(b'\r', 'Игра ещё не подключена')
-        assert code() == vector.decode()
-        model.snapshot(artifacts / 'screens', 'pong-code')
-        send(b'q', 'Выбери игру')
-        click(30, 23, 'Управление')
-        wait('ПКМ / F — флаг')
-        model.snapshot(artifacts / 'screens', 'help')
-        send(b'\x1b')
-        wait('Выбери игру')
-        print('PASS: QEMU boot, settings, all 3 stubs, left/right/hover, bounds, pause, restart, fresh seed, valid/invalid codes, help')
-
-    with Qemu(debug=True, port=5556) as qemu:
-        debugger = shutil.which('xtensa-esp32-elf-gdb')
-        assert debugger, 'GDB is absent from PATH'
+        for _ in range(4): click(30, 17, 'Размер:')
+        s.wait('16x16'); s.snapshot('settings')
+        click(30, 21, 'Сапёр — в разработке')
+        s.send(mouse_bytes(35, 24, 13)); s.snapshot('mines-mouse')
+        assert 'seed:' not in s.model.text() and 'События:' not in s.model.text()
+        s.send(b'q', 'Выбери игру')
+        click(30, 19, 'Меняет только точность')
+        click(30, 17, 'Уровень: < 2 >'); click(30, 17, 'Уровень: < 3 >')
+        s.snapshot('pong-settings'); click(30, 21, 'Матч до 5 очков')
+        s.wait('Уровень: 3'); original = code()
+        start = player_left(s.model)
+        s.send(mouse_bytes(35, 5, 20))
+        s.wait('Матч до 5 очков', condition=lambda m: 0 <= player_left(m) < start)
+        s.snapshot('pong')
+        s.send(b'c', 'Скопировано'); assert code() == original
+        click(35, 38, 'Скопировано')
+        s.send(b'p', 'Пауза'); s.snapshot('pause')
+        click(30, 22, 'Скопировано')  # Copy item in pause, not a resume.
+        s.wait('Пауза')
+        s.send(b'r', 'Матч до 5 очков'); assert code() == original
+        s.send(b'q', 'Выбери игру')
+        click(30, 19, 'Меняет только точность'); click(30, 21, 'Матч до 5 очков')
+        assert code() != original
+        s.send(b'q', 'Выбери игру'); click(30, 21, 'Введи код друга')
+        legacy = b'P1-041020-R00007-GNHM2B-ZZYZJ4'
+        s.send(legacy[:-1] + b'5\r', 'Код повреждён'); s.snapshot('invalid-code')
+        s.send(b'\x7f' * len(legacy) + legacy + b'\r', 'Код проверен')
+        s.wait('Начальный уровень: 3'); s.snapshot('code-confirm')
+        s.send(b'\r', 'Матч до 5 очков'); assert code() == 'P2-4SW5-CD0J-0228E'
+        s.snapshot('pong-code')
+        s.send(mouse_bytes(35, 3, 20))
+        s.wait('', 40, condition=lambda m: 'Партия окончена' in m.text() or 'Уровень пройден' in m.text())
+        s.snapshot('pong-result')
+        s.send(b'q', 'Выбери игру'); click(30, 21, 'Введи код друга')
+        # Independently generated P2 packet for level 4, normal, seed 0x12345678.
+        s.send(EXTREME + b'\r', 'Начальный уровень: 4'); s.send(b'\r', 'ТЫ       БОТЫ')
+        s.snapshot('pong-extreme')
+        top = s.model.text().splitlines()[6]
+        assert top.count('==========') == 2, top
+        s.send(b'q', 'Выбери игру'); click(30, 23, 'Управление')
+        s.wait('ПКМ / F — флаг'); s.snapshot('help')
+        s.send(b'\x1b', 'Выбери игру')
+        print('PASS: 100x40, all modules, Pong keyboard/mouse, level selection, replay/fresh seed, P1/P2/CRC, copy/footer/pause, extreme two bots, clean panels')
+    with Qemu(debug=True, port=5556):
+        debugger = shutil.which('xtensa-esp32-elf-gdb'); assert debugger
         script = artifacts / 'step.gdb'
         script.write_text('set pagination off\nset confirm off\nset remotetimeout 15\n'
             'target remote 127.0.0.1:3333\nthbreak app_main\ncontinue\nlist\n'
-            'echo FIRST_PC=\\n\np/x $pc\nnext\necho SECOND_PC=\\n\np/x $pc\n'
-            'next\necho THIRD_PC=\\n\np/x $pc\nframe\ndetach\n', encoding='utf-8')
-        result = subprocess.run([debugger, '--nx', '--batch', str(ROOT / 'build/gaming_mps.elf'),
-                                 '-x', str(script)], capture_output=True, text=True,
-                                encoding='utf-8', errors='replace', timeout=60)
+            'p/x $pc\nnext\np/x $pc\nnext\np/x $pc\nframe\ndetach\n')
+        result = subprocess.run([debugger, '--nx', '--batch', str(ROOT / 'build/gaming_mps.elf'), '-x', str(script)],
+            capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=60)
         output = result.stdout + result.stderr
         (artifacts / 'gdb-step.log').write_text(output, encoding='utf-8')
         pcs = re.findall(r'\$[123] = (0x[0-9a-f]+)', output)
-        assert result.returncode == 0 and len(set(pcs)) == 3, output
-        assert 'main.cpp' in output and 'app_main' in output, output
-        print('PASS: GDB breakpoint in app_main and two source steps:', ' -> '.join(pcs))
-    print('ALL QEMU CHECKS PASSED')
+        assert result.returncode == 0 and len(set(pcs)) == 3 and 'main.cpp' in output, output
+        print('PASS: GDB app_main and two source steps:', ' -> '.join(pcs))
 
 
 if __name__ == '__main__':

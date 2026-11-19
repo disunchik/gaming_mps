@@ -40,6 +40,8 @@ extern "C" void app_main() {
                 menu.handle(event);
         }
         if (reader.poll(static_cast<std::uint32_t>(now), event)) menu.handle(event);
+        const auto copy = menu.takeCopyRequest();
+        if (!copy.empty()) screen.copyText(copy);
         if (now - rendered >= 50) {
             menu.draw(screen);
             screen.flush();

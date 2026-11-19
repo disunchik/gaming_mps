@@ -26,23 +26,16 @@ void Stub::draw(Screen& screen) const {
                 screen.cell(left + 2 * x, top + y, Theme::muted,
                             pointer ? Theme::border : Theme::background, U'·');
             }
-        screen.text(0, 0, "Проверка клеток и указателя", Theme::accent);
-        screen.text(0, Screen::height - 1, "Это сетка ввода, мины не сгенерированы", Theme::muted);
+        screen.text(0, 0, "Сапёр — в разработке", Theme::accent);
+        screen.text(0, Screen::height - 1, "Механика появится в модуле сапёра", Theme::muted);
     } else {
         screen.text(5, 5, gameName(game_), Theme::accent);
         screen.text(5, 8, "Игра ещё не подключена");
-        screen.text(5, 10, "Это заглушка для проверки общей основы", Theme::muted);
-        screen.text(5, 13, "Нажми стрелку или щёлкни по полю");
+        screen.text(5, 10, "Механика появится в модуле тетриса", Theme::muted);
+        screen.text(5, 13, "Пока доступно только общее меню");
     }
-    screen.panelText(0, "Модуль: заглушка", Theme::accent);
-    screen.panelText(2, "Последнее действие:", Theme::muted);
-    screen.panelText(3, inputName(input_.type));
-    screen.panelNumber(5, "x:", input_.x);
-    screen.panelNumber(6, "y:", input_.y);
-    screen.panelNumber(8, "События:", events_);
-    screen.panelNumber(10, "Время, с:", static_cast<std::int64_t>(time_ / 1000));
-    screen.panelNumber(12, "seed:", settings_.seed);
-    screen.panelNumber(14, "Уровень:", settings_.level);
-    screen.panelText(16, difficultyName(settings_.difficulty));
-    screen.panelText(18, "Механика отсутствует", Theme::muted);
+    screen.panelText(0, "В разработке", Theme::muted);
+    screen.panelNumber(3, "Уровень:", settings_.level);
+    screen.panelText(6, "Сложность", Theme::muted);
+    screen.panelText(7, difficultyName(settings_.difficulty));
 }

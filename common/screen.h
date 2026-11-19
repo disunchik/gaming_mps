@@ -17,6 +17,8 @@ public:
     void begin();
     /** @brief Отправляет только изменившиеся участки кадра. */
     void flush();
+    /** @brief Отправляет запрос копирования через OSC52, вне отрисовки кадра. */
+    void copyText(std::string_view text);
     /** @brief Рисует текст в абсолютных координатах канваса; для оболочки. */
     void canvasText(int x, int y, std::string_view value,
                     Color foreground = Theme::text, Color background = Theme::background);

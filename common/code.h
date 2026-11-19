@@ -4,9 +4,9 @@
 #include <string>
 #include <string_view>
 
-/** @brief Проверяет допустимость всех стартовых условий версии 1. */
+/** @brief Проверяет допустимость всех стартовых условий P1/P2. */
 bool validSettings(GameId game, const Settings& settings);
-/** @brief Кодирует условия; возвращает пустую строку для неполного/неверного старта. */
+/** @brief Кодирует условия в P2; возвращает пустую строку для неполного/неверного старта. */
 std::string encodeCode(GameId game, const Settings& settings);
-/** @brief Проверяет и декодирует код; при ошибке оставляет выходные условия неизменными. */
+/** @brief Проверяет и декодирует P1/P2; при ошибке оставляет выходные условия неизменными. */
 bool decodeCode(std::string_view code, GameId& game, Settings& settings, std::string& error);

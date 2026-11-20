@@ -14,7 +14,7 @@ if ($env:GAMING_IDF_ACTIVATE) {
         . "$env:IDF_PATH\export.ps1"
     }
 } else {
-    $candidates = @('D:\Espressif\eim_idf.json', 'C:\Espressif\tools\eim_idf.json',
+    $candidates = @('D:\Espressif\eim_idf.json', 'C:\Espressif\eim_idf.json', 'C:\Espressif\tools\eim_idf.json',
         (Join-Path $env:USERPROFILE '.espressif\tools\eim_idf.json'))
     if ($env:IDF_TOOLS_PATH) { $candidates = @((Join-Path $env:IDF_TOOLS_PATH 'eim_idf.json')) + $candidates }
     $profile = $null

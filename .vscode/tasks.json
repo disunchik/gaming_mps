@@ -2,6 +2,20 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "QEMU: start debugger",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/vscode.ps1", "-Action", "Start"],
+      "problemMatcher": []
+    },
+    {
+      "label": "QEMU: stop debugger",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/vscode.ps1", "-Action", "Stop"],
+      "problemMatcher": []
+    },
+    {
       "label": "Собрать ESP32",
       "type": "shell",
       "command": "powershell.exe",

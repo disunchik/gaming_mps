@@ -16,17 +16,18 @@ ROOT = Path(__file__).resolve().parent.parent  # Project root, independent of cw
 
 class Qemu:
     """Own one QEMU process and its UART socket, including deterministic cleanup."""
-    def __init__(self, debug=False, port=5555):
+    def __init__(self, debug=False, port=5555, gdb_port=3333):
         """Configure the optional GDB server and local UART port."""
         self.debug = debug
         self.port = port
+        self.gdb_port = gdb_port
         self.process = None
         self.serial = None
         self.log = None
 
     def __enter__(self):
         """Merge firmware, configure eFuses, start QEMU, then connect UART."""
-        for port in ([self.port, 3333] if self.debug else [self.port]):
+        for port in ([self.port, self.gdb_port] if self.debug else [self.port]):
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
                 if hasattr(socket, 'SO_EXCLUSIVEADDRUSE'):
                     probe.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
@@ -40,11 +41,13 @@ class Qemu:
         idf = Path(os.environ['IDF_PATH'])
         sys.path.insert(0, str(idf / 'tools'))
         from idf_py_actions.qemu_ext import QEMU_TARGETS
-        flash = build / 'qemu_flash.bin'
+        images = ROOT / 'artifacts' / f'qemu-{self.port}'
+        images.mkdir(parents=True, exist_ok=True)
+        flash = images / 'flash.bin'
         subprocess.run([sys.executable, '-m', 'esptool', '--chip', 'esp32', 'merge_bin',
                         '--output', str(flash), '--fill-flash-size', '2MB', '@flash_args'],
                         cwd=build, check=True, stdout=subprocess.DEVNULL)
-        efuse = build / 'qemu_efuse.bin'
+        efuse = images / 'efuse.bin'
         if not efuse.exists(): efuse.write_bytes(QEMU_TARGETS['esp32'].default_efuse)
         executable = shutil.which('qemu-system-xtensa')
         if not executable: raise RuntimeError('Не найден qemu-xtensa в активированной среде ESP-IDF.')
@@ -55,16 +58,16 @@ class Qemu:
                 '-global', 'driver=timer.esp32.timg,property=wdt_disable,value=true',
                 '-nic', 'user,model=open_eth', '-display', 'none', '-monitor', 'none',
                 '-serial', f'tcp:127.0.0.1:{self.port},server=on,wait=on']
-        if self.debug: args += ['-gdb', 'tcp:127.0.0.1:3333', '-S']
+        if self.debug: args += ['-gdb', f'tcp:127.0.0.1:{self.gdb_port}', '-S']
         artifacts = ROOT / 'artifacts'
         artifacts.mkdir(exist_ok=True)
-        self.log = (artifacts / 'qemu-process.log').open('w', encoding='utf-8')
+        self.log = (images / 'process.log').open('w', encoding='utf-8')
         try:
             self.process = subprocess.Popen(args, stdout=self.log, stderr=subprocess.STDOUT)
             deadline = time.monotonic() + 15
             while time.monotonic() < deadline:
                 if self.process.poll() is not None:
-                    raise RuntimeError('QEMU завершился; смотри artifacts/qemu-process.log')
+                    raise RuntimeError(f'QEMU завершился; смотри {images / "process.log"}')
                 try:
                     self.serial = socket.create_connection(('127.0.0.1', self.port), timeout=0.2)
                     self.serial.settimeout(0.2)
@@ -141,15 +144,20 @@ def main():
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--port', help='COM-порт настоящего ESP32, например COM5')
     parser.add_argument('--baud', type=int, default=115200)
+    parser.add_argument('--uart-port', type=int, default=5555)
+    parser.add_argument('--gdb-port', type=int, default=3333)
     args = parser.parse_args()
     if args.port and args.debug: parser.error('--debug доступен для QEMU')
+    if not (1 <= args.uart_port <= 65535 and 1 <= args.gdb_port <= 65535):
+        parser.error('TCP-порты должны быть в диапазоне 1..65535')
+    if args.debug and args.uart_port == args.gdb_port: parser.error('UART и GDB требуют разных портов')
     if not args.no_build and not args.port:
         subprocess.run([sys.executable, str(Path(os.environ['IDF_PATH']) / 'tools/idf.py'),
                         '-DIDF_TARGET=esp32', 'build'], cwd=ROOT, check=True)
     print(f'{args.port or "QEMU"}: F10 или Ctrl+] — выйти.')
-    if args.debug: print('Ожидание GDB: во втором терминале idf.py gdb')
+    if args.debug: print(f'Ожидание GDB: 127.0.0.1:{args.gdb_port}')
     try:
-        with Terminal() as terminal, (SerialPort(args.port, args.baud) if args.port else Qemu(args.debug)) as qemu:
+        with Terminal() as terminal, (SerialPort(args.port, args.baud) if args.port else Qemu(args.debug, args.uart_port, args.gdb_port)) as qemu:
             qemu.serial.sendall(b'\x1b[930~')
             bridge = ClipboardBridge()
             send_lock = threading.Lock()

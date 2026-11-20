@@ -1,0 +1,8 @@
+PASS: installed VS Code C/C++ debug adapter, generated F5 configuration.
+PASS: temporary app_main breakpoint, two next requests and three distinct locations.
+{'line': 21, 'pc': '0x400d4230'}
+{'line': 22, 'pc': '0x400d4233'}
+{'line': 23, 'pc': '0x400d4256'}
+PASS: user breakpoint resolved to main/main.cpp:37, continue, stackTrace and scopes.
+This is a DAP integration test, not a screenshot of the VS Code UI.
+GDB architecture: The target architecture is set to "auto" (currently "xtensa").

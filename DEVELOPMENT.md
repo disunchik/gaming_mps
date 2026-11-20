@@ -365,3 +365,24 @@ USB-UART (115200). Игровая логика и генерация P2 рабо
 Кружка находится только в главном меню, на светлой афише под «Правила и фишки».
 Верхние подписи и нижняя подсказка сгруппированы рядом с афишей; координаты
 пунктов меню, игровых полей и формат P2 не менялись.
+
+
+## Отладка VS Code
+
+`Configure-VSCode.cmd` находит GDB через tools/enter.ps1 и создаёт игнорируемый
+`.vscode/launch.json`. F5 использует cppdbg, отдельный QEMU на UART 5558 / GDB 3334,
+временную точку app_main, preLaunchTask/postDebugTask. tools/vscode.ps1 хранит PID
+и время создания своего запускателя в artifacts; остановка не затрагивает чужие
+процессы. Порт и GDB-порт Qemu настраиваются, образы flash/efuse и логи разделены
+по UART-порту в artifacts/qemu-<port>. Обычные значения остаются 5555/3333.
+Игровые интерфейсы, P2, координаты и механики не изменены.
+
+В текущем Microsoft MIDebugEngine нет enum Xtensa: targetArchitecture=arm
+выбирает только 32-битное представление клиента cppdbg, без команды изменения
+архитектуры GDB. В проверке `show architecture` возвращает Xtensa; выполняется
+настоящая ESP32-прошивка. DAP-проверка установленного адаптера подтвердила
+app_main, F10/next, пользовательскую точку на main.cpp:37, стек и scopes.
+
+Проверка адаптера: запустить tools/vscode.ps1 -Action Start, затем в Windows
+`python tests/vscode_debug.py`, после — tools/vscode.ps1 -Action Stop.
+Тест использует установленный Microsoft C/C++ и созданный launch.json.
